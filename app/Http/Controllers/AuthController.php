@@ -16,13 +16,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
 
-/**
- * @OA\Info(
- *     title="CartMate Authentication API",
- *     version="1.0.0",
- *     description="API for CartMate user authentication and management"
- * )
- */
+
 class AuthController extends Controller
 {
     protected $otpService;
@@ -102,6 +96,7 @@ class AuthController extends Controller
 
         if ($validator->fails()) {
             return response()->json([
+                'success' => false,
                 'message' => 'Validation failed',
                 'errors' => $validator->errors()
             ], 422);
@@ -124,6 +119,7 @@ class AuthController extends Controller
         Mail::to($request->email)->send(new VerifyEmail($otpModel->otp, $verificationUrl));
 
         return response()->json([
+            'success' => true,
             'message' => 'Registration successful. Please check your email for verification code.',
             'user' => $user
         ], 201);
@@ -285,6 +281,7 @@ class AuthController extends Controller
 
         if ($validator->fails()) {
             return response()->json([
+                'success' => false,
                 'message' => 'Validation failed',
                 'errors' => $validator->errors()
             ], 422);
@@ -294,19 +291,23 @@ class AuthController extends Controller
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
+                'success' => false,
                 'message' => 'Invalid credentials'
             ], 401);
         }
 
-        if (!$user->email_verified_at) {
-            return response()->json([
-                'message' => 'Please verify your email first'
-            ], 403);
-        }
+        // Temporarily bypass email verification
+        // if (!$user->email_verified_at) {
+        //     return response()->json([
+        //         'success' => false,
+        //         'message' => 'Please verify your email first'
+        //     ], 403);
+        // }
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
+            'success' => true,
             'message' => 'Login successful',
             'user' => $user,
             'token' => $token

@@ -29,6 +29,15 @@ class Product extends Model
         'total_price',
         'images',
         'similar_products',
+        'features',           // New
+        'specifications',     // New
+        'brand',             // New
+        'category',          // New
+        'rating',            // New
+        'review_count',      // New
+        'in_stock',          // New
+        'sku',               // New
+        'additional_info'    // New
     ];
 
     /**
@@ -46,5 +55,9 @@ class Product extends Model
         'total_price' => 'float',
         'images' => 'array',
         'similar_products' => 'array',
+        'features' => 'array',
+        'specifications' => 'array',
+        'additional_info' => 'array',
+        'in_stock' => 'boolean',
     ];
 } 

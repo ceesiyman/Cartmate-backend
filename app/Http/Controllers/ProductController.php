@@ -72,8 +72,8 @@ class ProductController extends Controller
             // Check if product already exists with this URL
             $existingProduct = Product::where('original_url', $url)->first();
             if ($existingProduct) {
-                return response()->json([
-                    'success' => true,
+            return response()->json([
+                'success' => true,
                     'message' => 'Product already exists',
                     'data' => $existingProduct
                 ]);
@@ -287,6 +287,113 @@ class ProductController extends Controller
     }
 
     /**
+     * @OA\Get(
+     *     path="/api/products/trending",
+     *     summary="Get trending products based on cart additions",
+     *     tags={"Products"},
+     *     @OA\Parameter(
+     *         name="limit",
+     *         in="query",
+     *         description="Number of trending products to return",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=10)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Trending products retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="name", type="string", example="Product Name"),
+     *                     @OA\Property(property="original_price", type="number", format="float", example=99.99),
+     *                     @OA\Property(property="image", type="string", example="https://example.com/image.jpg"),
+     *                     @OA\Property(property="store", type="string", example="Amazon"),
+     *                     @OA\Property(property="cart_count", type="integer", example=42)
+     *                 )
+     *             )
+     *         )
+     *     )
+     * )
+     */
+    public function trending(Request $request)
+{
+    $limit = $request->input('limit', 4);
+
+    $trendingProducts = Product::select([
+        'products.id',
+        'products.name',
+        'products.original_price',
+        'products.discounted_price',
+        'products.image',
+        'products.description',
+        'products.store',
+        'products.original_url',
+        'products.shipping',
+        'products.customs',
+        'products.service_fee',
+        'products.vat',
+        'products.total_price',
+        'products.images',
+        'products.similar_products',
+        'products.features',
+        'products.specifications',
+        'products.brand',
+        'products.category',
+        'products.rating',
+        'products.review_count',
+        'products.in_stock',
+        'products.sku',
+        'products.additional_info',
+        'products.created_at',
+        'products.updated_at'
+    ])
+    ->selectRaw('COUNT(carts.id) as cart_count')
+    ->leftJoin('carts', 'products.id', '=', 'carts.product_id')
+    ->groupBy([
+        'products.id',
+        'products.name',
+        'products.original_price',
+        'products.discounted_price',
+        'products.image',
+        'products.description',
+        'products.store',
+        'products.original_url',
+        'products.shipping',
+        'products.customs',
+        'products.service_fee',
+        'products.vat',
+        'products.total_price',
+        'products.images',
+        'products.similar_products',
+        'products.features',
+        'products.specifications',
+        'products.brand',
+        'products.category',
+        'products.rating',
+        'products.review_count',
+        'products.in_stock',
+        'products.sku',
+        'products.additional_info',
+        'products.created_at',
+        'products.updated_at'
+    ])
+    ->orderBy('cart_count', 'desc')
+    ->limit($limit)
+    ->get();
+
+    return response()->json([
+        'success' => true,
+        'data' => $trendingProducts
+    ]);
+}
+
+
+    /**
      * Scrape product details from a URL
      *
      * @param string $url
@@ -486,66 +593,74 @@ class ProductController extends Controller
      * @return array
      */
     private function parseProductHtml($html, $platform, $url)
-    {
-        $crawler = new Crawler($html);
-        
-        $productData = [
-            'name' => '',
-            'original_price' => 0,
-            'discounted_price' => null,
-            'image' => '',
-            'description' => '',
-            'store' => ucfirst($platform),
-            'original_url' => $url,
-            'shipping' => 0,
-            'customs' => 0,
-            'service_fee' => 0,
-            'vat' => 0,
-            'total_price' => 0,
-            'images' => [],
-        ];
-        
-        switch ($platform) {
-            case 'amazon':
-                $productData = $this->parseAmazonProduct($crawler, $productData);
-                break;
-            case 'walmart':
-                $productData = $this->parseWalmartProduct($crawler, $productData);
-                break;
-            case 'ebay':
-                $productData = $this->parseEbayProduct($crawler, $productData);
-                break;
-            case 'aliexpress':
-                $productData = $this->parseAliexpressProduct($crawler, $productData);
-                break;
-            case 'alibaba':
-                $productData = $this->parseAlibabaProduct($crawler, $productData);
-                break;
-            case 'zara':
-                $productData = $this->parseZaraProduct($crawler, $productData);
-                break;
-            case 'etsy':
-                $productData = $this->parseEtsyProduct($crawler, $productData);
-                break;
-            default:
-                // Generic parsing for unknown platforms
-                $productData = $this->parseGenericProduct($crawler, $productData);
-                break;
-        }
-        
-        // Calculate additional fees
-        $productData['shipping'] = 25.0;
-        $productData['customs'] = 18.5;
-        $productData['service_fee'] = 12.99;
-        $productData['vat'] = $productData['original_price'] * 0.2; // 20% VAT
-        $productData['total_price'] = $productData['original_price'] + 
-                                     $productData['shipping'] + 
-                                     $productData['customs'] + 
-                                     $productData['service_fee'] + 
-                                     $productData['vat'];
-        
-        return $productData;
+{
+    $crawler = new Crawler($html);
+    
+    $productData = [
+        'name' => '',
+        'original_price' => 0,
+        'discounted_price' => null,
+        'image' => '',
+        'description' => '',
+        'store' => ucfirst($platform),
+        'original_url' => $url,
+        'shipping' => 0,
+        'customs' => 0,
+        'service_fee' => 0,
+        'vat' => 0,
+        'total_price' => 0,
+        'images' => [],
+        'features' => [],           // New
+        'specifications' => [],     // New
+        'brand' => null,           // New
+        'category' => null,        // New
+        'rating' => null,          // New
+        'review_count' => 0,       // New
+        'in_stock' => true,        // New
+        'sku' => null,             // New
+        'additional_info' => []    // New
+    ];
+    
+    switch ($platform) {
+        case 'amazon':
+            $productData = $this->parseAmazonProduct($crawler, $productData);
+            break;
+        case 'walmart':
+            $productData = $this->parseWalmartProduct($crawler, $productData);
+            break;
+        case 'ebay':
+            $productData = $this->parseEbayProduct($crawler, $productData);
+            break;
+        case 'aliexpress':
+            $productData = $this->parseAliexpressProduct($crawler, $productData);
+            break;
+        case 'alibaba':
+            $productData = $this->parseAlibabaProduct($crawler, $productData);
+            break;
+        case 'zara':
+            $productData = $this->parseZaraProduct($crawler, $productData);
+            break;
+        case 'etsy':
+            $productData = $this->parseEtsyProduct($crawler, $productData);
+            break;
+        default:
+            $productData = $this->parseGenericProduct($crawler, $productData);
+            break;
     }
+    
+    // Calculate additional fees
+    $productData['shipping'] = 25.0;
+    $productData['customs'] = 18.5;
+    $productData['service_fee'] = 12.99;
+    $productData['vat'] = $productData['original_price'] * 0.2; // 20% VAT
+    $productData['total_price'] = $productData['original_price'] + 
+                                 $productData['shipping'] + 
+                                 $productData['customs'] + 
+                                 $productData['service_fee'] + 
+                                 $productData['vat'];
+    
+    return $productData;
+}
     
     /**
      * Parse Amazon product
@@ -555,98 +670,172 @@ class ProductController extends Controller
      * @return array
      */
     private function parseAmazonProduct($crawler, $productData)
-    {
-        try {
-            // Extract product name - try multiple possible selectors
-            $productData['name'] = $this->getFirstAvailableText($crawler, [
-                '#productTitle',
-                'h1#title',
-                'span#productTitle'
-            ]) ?? 'Unknown Product';
-            
-            // Extract price - try multiple possible selectors
-            $priceText = $this->getFirstAvailableText($crawler, [
-                'span.a-price .a-offscreen',
-                '#priceblock_ourprice',
-                '#priceblock_saleprice',
-                '.a-price .a-price-whole',
-                'span[data-a-color="price"] .a-offscreen'
-            ]) ?? '';
-            
-            $productData['original_price'] = $this->extractPrice($priceText);
-            
-            // Extract discounted price if available
-            $discountedPriceText = $this->getFirstAvailableText($crawler, [
-                '#priceblock_dealprice',
-                '#priceblock_saleprice',
-                '.savingsPercentage + .a-price .a-offscreen'
-            ]) ?? '';
-            
-            if ($discountedPriceText) {
-                $productData['discounted_price'] = $this->extractPrice($discountedPriceText);
-            }
-            
-            // Extract image - try multiple possible selectors
-            $productData['image'] = $this->getFirstAvailableAttribute($crawler, [
-                '#landingImage',
-                '#imgBlkFront',
-                '#main-image',
-                'img[data-a-image-name="landingImage"]'
-            ], 'src') ?? '';
-            
-            // Convert to high-res image URL if needed
-            if ($productData['image']) {
-                $productData['image'] = preg_replace('/\._[^\.]+_\./', '.', $productData['image']);
-            }
-            
-            // Extract description
-            $productData['description'] = $this->getFirstAvailableText($crawler, [
-                '#productDescription',
-                '#feature-bullets',
-                '#productDetails_feature_div'
-            ]) ?? '';
-            
-            // Extract additional images
-            $productData['images'] = [];
-            
-            // Try different image gallery selectors
-            $imagePaths = [
-                '#altImages .a-button-thumbnail img',
-                '#imageBlock_feature_div .item img',
-                '.imageThumbnail img'
-            ];
-            
-            foreach ($imagePaths as $path) {
-                try {
-                    $crawler->filter($path)->each(function (Crawler $node) use (&$productData) {
-                        $imgSrc = $node->attr('src');
-                        if ($imgSrc) {
-                            // Convert thumbnail URL to high-res image URL
-                            $highResSrc = preg_replace('/\._[^\.]+_\./', '.', $imgSrc);
-                            if (!in_array($highResSrc, $productData['images'])) {
-                                $productData['images'][] = $highResSrc;
-                            }
-                        }
-                    });
-                    
-                    if (!empty($productData['images'])) {
-                        break;
-                    }
-                } catch (\Exception $e) {
-                    continue;
-                }
-            }
-            
-            // Set store
-            $productData['store'] = 'Amazon';
-            
-        } catch (\Exception $e) {
-            Log::error('Error parsing Amazon product: ' . $e->getMessage());
-            throw new \Exception('Failed to parse Amazon product details');
+{
+    try {
+        // Extract product name
+        $productData['name'] = $this->getFirstAvailableText($crawler, [
+            '#productTitle',
+            'h1#title',
+            'span#productTitle'
+        ]) ?? 'Unknown Product';
+        
+        // Extract price
+        $priceText = $this->getFirstAvailableText($crawler, [
+            'span.a-price .a-offscreen',
+            '#priceblock_ourprice',
+            '#priceblock_saleprice',
+            '.a-price .a-price-whole',
+            'span[data-a-color="price"] .a-offscreen'
+        ]) ?? '';
+        $productData['original_price'] = $this->extractPrice($priceText);
+        
+        // Extract discounted price
+        $discountedPriceText = $this->getFirstAvailableText($crawler, [
+            '#priceblock_dealprice',
+            '#priceblock_saleprice',
+            '.savingsPercentage + .a-price .a-offscreen'
+        ]) ?? '';
+        if ($discountedPriceText) {
+            $productData['discounted_price'] = $this->extractPrice($discountedPriceText);
         }
         
-        return $productData;
+        // Extract image
+        $productData['image'] = $this->getFirstAvailableAttribute($crawler, [
+            '#landingImage',
+            '#imgBlkFront',
+            '#main-image',
+            'img[data-a-image-name="landingImage"]'
+        ], 'src') ?? '';
+        if ($productData['image']) {
+            $productData['image'] = preg_replace('/\._[^\.]+_\./', '.', $productData['image']);
+        }
+        
+        // Extract description
+        $productData['description'] = $this->getFirstAvailableText($crawler, [
+            '#productDescription',
+            '#feature-bullets',
+            '#productDetails_feature_div'
+        ]) ?? '';
+        
+        // Extract additional images
+        $productData['images'] = [];
+        $imagePaths = [
+            '#altImages .a-button-thumbnail img',
+            '#imageBlock_feature_div .item img',
+            '.imageThumbnail img'
+        ];
+        foreach ($imagePaths as $path) {
+            try {
+                $crawler->filter($path)->each(function (Crawler $node) use (&$productData) {
+                    $imgSrc = $node->attr('src');
+                    if ($imgSrc) {
+                        $highResSrc = preg_replace('/\._[^\.]+_\./', '.', $imgSrc);
+                        if (!in_array($highResSrc, $productData['images'])) {
+                            $productData['images'][] = $highResSrc;
+                        }
+                    }
+                });
+                if (!empty($productData['images'])) {
+                    break;
+                }
+            } catch (\Exception $e) {
+                continue;
+            }
+        }
+        
+        // Extract features (from feature bullets)
+        $productData['features'] = [];
+        try {
+            $crawler->filter('#feature-bullets ul li')->each(function (Crawler $node) use (&$productData) {
+                $feature = trim($node->text());
+                if ($feature) {
+                    $productData['features'][] = $feature;
+                }
+            });
+        } catch (\Exception $e) {
+            Log::warning('Failed to extract Amazon features: ' . $e->getMessage());
+        }
+        
+        // Extract specifications (from product details or technical details)
+        $productData['specifications'] = [];
+        try {
+            $crawler->filter('#productDetails_techSpec_section_1 tr, #productDetails_detailBullets_sections1 tr')->each(function (Crawler $node) use (&$productData) {
+                $key = trim($node->filter('th')->text());
+                $value = trim($node->filter('td')->text());
+                if ($key && $value) {
+                    $productData['specifications'][$key] = $value;
+                }
+            });
+        } catch (\Exception $e) {
+            Log::warning('Failed to extract Amazon specifications: ' . $e->getMessage());
+        }
+        
+        // Extract brand
+        $productData['brand'] = $this->getFirstAvailableText($crawler, [
+            '#bylineInfo',
+            '#brand',
+            'a#bylineInfo'
+        ]) ?? null;
+        
+        // Extract category (from breadcrumb)
+        $productData['category'] = null;
+        try {
+            $categories = $crawler->filter('#wayfinding-breadcrumbs_feature_div ul li a')->each(function (Crawler $node) {
+                return trim($node->text());
+            });
+            $productData['category'] = !empty($categories) ? implode(' > ', $categories) : null;
+        } catch (\Exception $e) {
+            Log::warning('Failed to extract Amazon category: ' . $e->getMessage());
+        }
+        
+        // Extract rating
+        $ratingText = $this->getFirstAvailableText($crawler, [
+            '#acrPopover .a-declarative .a-size-base',
+            '.reviewCountTextLinkedHistogram .a-size-base'
+        ]) ?? '';
+        $productData['rating'] = $ratingText ? floatval(preg_replace('/[^0-9.]/', '', $ratingText)) : null;
+        
+        // Extract review count
+        $reviewCountText = $this->getFirstAvailableText($crawler, [
+            '#acrCustomerReviewText',
+            '.averageStarRatingNumerical .a-size-base'
+        ]) ?? '';
+        $productData['review_count'] = $reviewCountText ? (int) preg_replace('/[^0-9]/', '', $reviewCountText) : 0;
+        
+        // Extract stock status
+        $stockText = $this->getFirstAvailableText($crawler, [
+            '#availability .a-size-medium',
+            '#availabilityInsideBuyBox_feature_div .a-size-medium'
+        ]) ?? '';
+        $productData['in_stock'] = str_contains(strtolower($stockText), 'in stock') || empty($stockText);
+        
+        // Extract SKU (ASIN for Amazon)
+        $productData['sku'] = $this->getFirstAvailableText($crawler, [
+            '#productDetails_detailBullets_sections1 tr:contains("ASIN") td',
+            '#ASIN'
+        ]) ?? null;
+        
+        // Extract additional info (e.g., color, size, etc.)
+        $productData['additional_info'] = [];
+        try {
+            $crawler->filter('#variation_color_name .selection, #variation_size_name .selection')->each(function (Crawler $node) use (&$productData) {
+                $key = str_contains($node->ancestors()->attr('id'), 'color') ? 'Color' : 'Size';
+                $productData['additional_info'][$key] = trim($node->text());
+            });
+        } catch (\Exception $e) {
+            Log::warning('Failed to extract Amazon additional info: ' . $e->getMessage());
+        }
+        
+        // Set store
+        $productData['store'] = 'Amazon';
+        
+    } catch (\Exception $e) {
+        Log::error('Error parsing Amazon product: ' . $e->getMessage());
+        throw new \Exception('Failed to parse Amazon product details');
     }
+    
+    return $productData;
+}
     
     /**
      * Helper function to get the first available text from multiple selectors
@@ -1506,26 +1695,37 @@ class ProductController extends Controller
      */
     private function parseGenericProduct($crawler, $productData)
     {
-        // Try to extract product name from meta tags
         $productData['name'] = $crawler->filter('meta[property="og:title"]')->attr('content') ?? 
                               $crawler->filter('h1')->text() ?? 
                               'Unknown Product';
         
-        // Try to extract price from meta tags or other elements
         $priceText = $crawler->filter('meta[property="product:price:amount"]')->attr('content') ?? 
                     $crawler->filter('[class*="price"]')->text() ?? 
                     '';
         $productData['original_price'] = $this->extractPrice($priceText);
         
-        // Try to extract image from meta tags
         $productData['image'] = $crawler->filter('meta[property="og:image"]')->attr('content') ?? 
                                $crawler->filter('img[class*="product"]')->attr('src') ?? 
                                '';
         
-        // Try to extract description from meta tags
         $productData['description'] = $crawler->filter('meta[property="og:description"]')->attr('content') ?? 
                                     $crawler->filter('[class*="description"]')->text() ?? 
                                     '';
+        
+        $productData['brand'] = $crawler->filter('meta[property="product:brand"]')->attr('content') ?? null;
+        
+        $productData['category'] = $crawler->filter('.breadcrumb')->text() ?? null;
+        
+        $ratingText = $crawler->filter('[itemprop="ratingValue"]')->text() ?? '';
+        $productData['rating'] = $ratingText ? floatval($ratingText) : null;
+        
+        $reviewCountText = $crawler->filter('[itemprop="reviewCount"]')->text() ?? '';
+        $productData['review_count'] = $reviewCountText ? (int) $reviewCountText : 0;
+        
+        $stockText = $crawler->filter('[class*="stock"], [class*="availability"]')->text() ?? '';
+        $productData['in_stock'] = str_contains(strtolower($stockText), 'in stock') || empty($stockText);
+        
+        $productData['sku'] = $crawler->filter('[itemprop="sku"]')->text() ?? null;
         
         return $productData;
     }

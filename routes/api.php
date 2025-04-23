@@ -8,7 +8,9 @@ use App\Http\Controllers\OtpController;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\VerifyEmail;
 use App\Http\Controllers\CartController;
-
+use App\Http\Controllers\StoreController;
+use App\Http\Controllers\OrderController;
+use App\Http\Controllers\UserController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -30,6 +32,13 @@ Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
 
 // Product routes
 Route::post('/products/fetch', [ProductController::class, 'fetchProduct']);
+Route::get('/products/trending', [ProductController::class, 'trending']);
+
+// Cart routes
+Route::post('/cart/add', [CartController::class, 'addToCart']);
+Route::get('/cart', [CartController::class, 'getCart']);
+Route::patch('/cart/update', [CartController::class, 'updateCartItem']);
+Route::delete('/cart/remove', [CartController::class, 'removeCartItem']);
 
 // Test route for email
 Route::get('/test-email', function () {
@@ -57,14 +66,36 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/user', [AuthController::class, 'user']);
     
     // Product routes
-    Route::get('/products', [ProductController::class, 'index']);
+
     Route::get('/products/{id}', [ProductController::class, 'show']);
     Route::post('/products', [ProductController::class, 'store']);
     Route::put('/products/{id}', [ProductController::class, 'update']);
     Route::delete('/products/{id}', [ProductController::class, 'destroy']);
     Route::post('/products/scrape', [ProductController::class, 'scrapeProduct']);
 
-    // Cart routes
-    Route::post('/cart/add', [CartController::class, 'addToCart']);
-    Route::get('/cart', [CartController::class, 'getCart']);
+    
 }); 
+Route::get('/products', [ProductController::class, 'index']);
+Route::get('/products/{id}', [ProductController::class, 'show']);
+
+ // Store routes
+    Route::get('/stores', [StoreController::class, 'index']);
+    Route::post('/stores', [StoreController::class, 'store']);
+    Route::get('/stores/{id}', [StoreController::class, 'show']);
+    Route::put('/stores/{id}', [StoreController::class, 'update']);
+    Route::delete('/stores/{id}', [StoreController::class, 'destroy']);
+
+// Order routes
+    Route::post('/orders', [OrderController::class, 'store']);
+    Route::get('/orders', [OrderController::class, 'index']);
+    Route::get('/orders/{id}', [OrderController::class, 'show']);
+    Route::put('/orders/{id}/cancel', [OrderController::class, 'cancel']);
+    Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/user', [UserController::class, 'getUser']);
+        Route::post('/user/update', [UserController::class, 'updateUser']);
+    });
+    
+    Route::get('/user/get', [UserController::class, 'getUser']);
+    Route::post('/user/update', [UserController::class, 'updateUser']);
