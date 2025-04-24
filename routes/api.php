@@ -91,6 +91,26 @@ Route::get('/products/{id}', [ProductController::class, 'show']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
     Route::put('/orders/{id}/cancel', [OrderController::class, 'cancel']);
     Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+    Route::get('/orders-filter', [OrderController::class, 'filterOrders']);
+    Route::get('/orders-stats', [OrderController::class, 'getOrderStats']);
+    Route::get('/orders-recent', [OrderController::class, 'getRecentOrders']);
+    Route::get('/orders/{id}/details', [OrderController::class, 'getOrderDetails']);
+
+    // Order Updates
+Route::get('/orders/{id}/updates', [OrderController::class, 'getUpdates']);
+Route::post('/orders/{id}/updates', [OrderController::class, 'addUpdate']);
+Route::put('/orders/{id}/updates/{update_id}', [OrderController::class, 'updateUpdate']);
+Route::delete('/orders/{id}/updates/{update_id}', [OrderController::class, 'deleteUpdate']);
+
+// Order Messages
+Route::get('/orders/{id}/messages', [OrderController::class, 'getMessages']);
+Route::post('/orders/{id}/messages', [OrderController::class, 'addMessage']);
+Route::delete('/orders/{id}/messages/{message_id}', [OrderController::class, 'deleteMessage']);
+
+// Order Documents
+Route::get('/orders/{id}/documents', [OrderController::class, 'getDocuments']);
+Route::post('/orders/{id}/documents', [OrderController::class, 'uploadDocument']);
+Route::delete('/orders/{id}/documents/{document_id}', [OrderController::class, 'deleteDocument']);
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/user', [UserController::class, 'getUser']);

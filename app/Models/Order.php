@@ -35,11 +35,17 @@ class Order extends Model
         'shipping_address',
         'billing_address',
         'phone_number',
+        'updates',
+        'messages',
+        'documents',
         'notes'
     ];
 
     protected $casts = [
         'total_amount' => 'float', 
+        'updates' => 'array',
+        'messages' => 'array',
+        'documents' => 'array'
     ];
 
     public function user()
