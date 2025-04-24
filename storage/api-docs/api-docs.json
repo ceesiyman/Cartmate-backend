@@ -937,6 +937,104 @@
                 ]
             }
         },
+        "/api/admin/dashboard/analytics": {
+            "get": {
+                "tags": [
+                    "Admin Dashboard"
+                ],
+                "summary": "Get order analytics for admin dashboard",
+                "operationId": "2cd63a67e3544dbe3a8d0e69229cb5f7",
+                "parameters": [
+                    {
+                        "name": "time_range",
+                        "in": "query",
+                        "description": "Time range for analytics",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "week",
+                            "enum": [
+                                "week",
+                                "month",
+                                "year"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Order analytics data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "orderVolume": {
+                                            "properties": {
+                                                "labels": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "datasets": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "data": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "integer"
+                                                                }
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "revenueByCategory": {
+                                            "properties": {
+                                                "labels": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "datasets": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "data": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "integer"
+                                                                }
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/cart/add": {
             "post": {
                 "tags": [
