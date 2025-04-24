@@ -857,6 +857,7 @@ class AuthController extends Controller
             ->map(function ($order) {
                 return [
                     'id' => $order->order_number,
+                    'order_id'=> $order->id,
                     'customer' => $order->user ? $order->user->name : 'Unknown Customer',
                     'date' => $order->created_at->format('F j, Y'),
                     'amount' => $order->total_amount,
