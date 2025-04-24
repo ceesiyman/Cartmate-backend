@@ -9,27 +9,11 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 /**
- * @OA\Info(
- *     version="1.0.0",
- *     title="User API Documentation",
- *     description="API documentation for managing user details",
- *     @OA\Contact(
- *         email="admin@example.com"
- *     )
- * )
- * 
- * @OA\Server(
- *     url="/",
- *     description="API Server"
- * )
- * 
- * @OA\SecurityScheme(
- *     securityScheme="sanctum",
- *     type="http",
- *     scheme="bearer"
+ * @OA\Tag(
+ *     name="User",
+ *     description="API Endpoints for managing user details"
  * )
  */
-
 class UserController extends Controller
 {
     /**

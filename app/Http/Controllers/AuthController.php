@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
+use App\Models\Order;
 
 
 class AuthController extends Controller
@@ -318,25 +319,16 @@ class AuthController extends Controller
      * @OA\Post(
      *     path="/api/auth/admin/login",
      *     summary="Admin login",
+     *     description="Login with admin credentials to get access token",
+     *     operationId="adminLogin",
      *     tags={"Authentication"},
      *     @OA\RequestBody(
      *         required=true,
+     *         description="Admin credentials",
      *         @OA\JsonContent(
-     *             required={"email", "password"},
-     *             @OA\Property(
-     *                 property="email",
-     *                 type="string",
-     *                 format="email",
-     *                 description="Admin email address",
-     *                 example="admin@cartmate.com"
-     *             ),
-     *             @OA\Property(
-     *                 property="password",
-     *                 type="string",
-     *                 format="password",
-     *                 description="Admin password",
-     *                 example="admin123"
-     *             )
+     *             required={"email","password"},
+     *             @OA\Property(property="email", type="string", format="email", example="admin@cartmate.com", description="Admin email"),
+     *             @OA\Property(property="password", type="string", format="password", example="admin123", description="Admin password")
      *         )
      *     ),
      *     @OA\Response(
@@ -367,6 +359,22 @@ class AuthController extends Controller
      *         description="Unauthorized access",
      *         @OA\JsonContent(
      *             @OA\Property(property="message", type="string", example="Unauthorized. Admin access only.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="The email field is required."),
+     *             @OA\Property(
+     *                 property="errors",
+     *                 type="object",
+     *                 @OA\Property(
+     *                     property="email",
+     *                     type="array",
+     *                     @OA\Items(type="string", example="The email field is required.")
+     *                 )
+     *             )
      *         )
      *     )
      * )
@@ -651,5 +659,151 @@ class AuthController extends Controller
             \Log::error("Failed to generate/send OTP: " . $e->getMessage());
             throw $e;
         }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/admin/dashboard/stats",
+     *     summary="Get admin dashboard statistics",
+     *     description="Get statistics for total orders, revenue, customers, and pending orders with week-over-week changes",
+     *     operationId="getDashboardStats",
+     *     tags={"Admin Dashboard"},
+     *     security={{"bearerAuth": {}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Dashboard statistics retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(
+     *                 property="total_orders",
+     *                 type="object",
+     *                 @OA\Property(property="count", type="integer", example=1248),
+     *                 @OA\Property(property="percentage_change", type="number", format="float", example=12.5),
+     *                 @OA\Property(property="trend", type="string", example="increase")
+     *             ),
+     *             @OA\Property(
+     *                 property="total_revenue",
+     *                 type="object",
+     *                 @OA\Property(property="amount", type="number", format="float", example=283945.78),
+     *                 @OA\Property(property="percentage_change", type="number", format="float", example=8.3),
+     *                 @OA\Property(property="trend", type="string", example="increase")
+     *             ),
+     *             @OA\Property(
+     *                 property="total_customers",
+     *                 type="object",
+     *                 @OA\Property(property="count", type="integer", example=856),
+     *                 @OA\Property(property="percentage_change", type="number", format="float", example=5.2),
+     *                 @OA\Property(property="trend", type="string", example="increase")
+     *             ),
+     *             @OA\Property(
+     *                 property="pending_orders",
+     *                 type="object",
+     *                 @OA\Property(property="count", type="integer", example=42),
+     *                 @OA\Property(property="percentage_change", type="number", format="float", example=-3.1),
+     *                 @OA\Property(property="trend", type="string", example="decrease")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthenticated",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=403,
+     *         description="Unauthorized - Not an admin",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthorized. Admin access only.")
+     *         )
+     *     )
+     * )
+     */
+    public function getStats(Request $request)
+    {
+        // Verify admin token
+        $user = $request->user();
+        if (!$user || $user->role !== 'ADMIN') {
+            return response()->json([
+                'message' => 'Unauthorized. Admin access only.'
+            ], 403);
+        }
+
+        // Get date ranges
+        $now = Carbon::now();
+        $currentWeekStart = $now->copy()->startOfWeek();
+        $currentWeekEnd = $now->copy()->endOfWeek();
+        $lastWeekStart = $now->copy()->subWeek()->startOfWeek();
+        $lastWeekEnd = $now->copy()->subWeek()->endOfWeek();
+
+        // Get total orders statistics
+        $currentWeekOrders = Order::whereBetween('created_at', [$currentWeekStart, $currentWeekEnd])->count();
+        $lastWeekOrders = Order::whereBetween('created_at', [$lastWeekStart, $lastWeekEnd])->count();
+        $ordersPercentageChange = $this->calculatePercentageChange($lastWeekOrders, $currentWeekOrders);
+
+        // Get total revenue from completed orders
+        $currentWeekRevenue = Order::where('status', 'completed')
+            ->whereBetween('created_at', [$currentWeekStart, $currentWeekEnd])
+            ->sum('total_amount');
+        $lastWeekRevenue = Order::where('status', 'completed')
+            ->whereBetween('created_at', [$lastWeekStart, $lastWeekEnd])
+            ->sum('total_amount');
+        $revenuePercentageChange = $this->calculatePercentageChange($lastWeekRevenue, $currentWeekRevenue);
+
+        // Get total customers (excluding admins)
+        $currentWeekCustomers = User::where('role', '!=', 'ADMIN')
+            ->whereBetween('created_at', [$currentWeekStart, $currentWeekEnd])
+            ->count();
+        $lastWeekCustomers = User::where('role', '!=', 'ADMIN')
+            ->whereBetween('created_at', [$lastWeekStart, $lastWeekEnd])
+            ->count();
+        $customersPercentageChange = $this->calculatePercentageChange($lastWeekCustomers, $currentWeekCustomers);
+
+        // Get pending orders
+        $currentWeekPendingOrders = Order::where('status', 'pending')
+            ->whereBetween('created_at', [$currentWeekStart, $currentWeekEnd])
+            ->count();
+        $lastWeekPendingOrders = Order::where('status', 'pending')
+            ->whereBetween('created_at', [$lastWeekStart, $lastWeekEnd])
+            ->count();
+        $pendingOrdersPercentageChange = $this->calculatePercentageChange($lastWeekPendingOrders, $currentWeekPendingOrders);
+
+        return response()->json([
+            'total_orders' => [
+                'count' => $currentWeekOrders,
+                'percentage_change' => $ordersPercentageChange,
+                'trend' => $ordersPercentageChange >= 0 ? 'increase' : 'decrease'
+            ],
+            'total_revenue' => [
+                'amount' => $currentWeekRevenue,
+                'percentage_change' => $revenuePercentageChange,
+                'trend' => $revenuePercentageChange >= 0 ? 'increase' : 'decrease'
+            ],
+            'total_customers' => [
+                'count' => $currentWeekCustomers,
+                'percentage_change' => $customersPercentageChange,
+                'trend' => $customersPercentageChange >= 0 ? 'increase' : 'decrease'
+            ],
+            'pending_orders' => [
+                'count' => $currentWeekPendingOrders,
+                'percentage_change' => $pendingOrdersPercentageChange,
+                'trend' => $pendingOrdersPercentageChange >= 0 ? 'increase' : 'decrease'
+            ]
+        ]);
+    }
+
+    /**
+     * Calculate percentage change between two values
+     *
+     * @param float $oldValue
+     * @param float $newValue
+     * @return float
+     */
+    private function calculatePercentageChange($oldValue, $newValue)
+    {
+        if ($oldValue == 0) {
+            return $newValue > 0 ? 100 : 0;
+        }
+        return round((($newValue - $oldValue) / $oldValue) * 100);
     }
 } 
