@@ -1,17 +1,17 @@
 {
     "openapi": "3.0.0",
     "info": {
-        "title": "User API Documentation",
-        "description": "API documentation for managing user details",
+        "title": "Cartmate API Documentation",
+        "description": "API documentation for Cartmate Backend",
         "contact": {
-            "email": "admin@example.com"
+            "email": "admin@cartmate.com"
         },
         "version": "1.0.0"
     },
     "servers": [
         {
-            "url": "/",
-            "description": "API Server"
+            "url": "http://127.0.0.1:8000",
+            "description": "Cartmate API Server"
         }
     ],
     "paths": {
@@ -285,8 +285,10 @@
                     "Authentication"
                 ],
                 "summary": "Admin login",
-                "operationId": "40bcb05ed57779f2d1198a94eb6ac5c8",
+                "description": "Login with admin credentials to get access token",
+                "operationId": "adminLogin",
                 "requestBody": {
+                    "description": "Admin credentials",
                     "required": true,
                     "content": {
                         "application/json": {
@@ -297,7 +299,7 @@
                                 ],
                                 "properties": {
                                     "email": {
-                                        "description": "Admin email address",
+                                        "description": "Admin email",
                                         "type": "string",
                                         "format": "email",
                                         "example": "admin@cartmate.com"
@@ -381,6 +383,34 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Unauthorized. Admin access only."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "The email field is required."
+                                        },
+                                        "errors": {
+                                            "properties": {
+                                                "email": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The email field is required."
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
@@ -615,6 +645,140 @@
                                         },
                                         "user": {
                                             "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin/dashboard/stats": {
+            "get": {
+                "tags": [
+                    "Admin Dashboard"
+                ],
+                "summary": "Get admin dashboard statistics",
+                "description": "Get statistics for total orders, revenue, customers, and pending orders with week-over-week changes",
+                "operationId": "getDashboardStats",
+                "responses": {
+                    "200": {
+                        "description": "Dashboard statistics retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "total_orders": {
+                                            "properties": {
+                                                "count": {
+                                                    "type": "integer",
+                                                    "example": 1248
+                                                },
+                                                "percentage_change": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 12.5
+                                                },
+                                                "trend": {
+                                                    "type": "string",
+                                                    "example": "increase"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "total_revenue": {
+                                            "properties": {
+                                                "amount": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 283945.78
+                                                },
+                                                "percentage_change": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 8.3
+                                                },
+                                                "trend": {
+                                                    "type": "string",
+                                                    "example": "increase"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "total_customers": {
+                                            "properties": {
+                                                "count": {
+                                                    "type": "integer",
+                                                    "example": 856
+                                                },
+                                                "percentage_change": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 5.2
+                                                },
+                                                "trend": {
+                                                    "type": "string",
+                                                    "example": "increase"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "pending_orders": {
+                                            "properties": {
+                                                "count": {
+                                                    "type": "integer",
+                                                    "example": 42
+                                                },
+                                                "percentage_change": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": -3.1
+                                                },
+                                                "trend": {
+                                                    "type": "string",
+                                                    "example": "decrease"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Unauthorized - Not an admin",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthorized. Admin access only."
                                         }
                                     },
                                     "type": "object"
@@ -3592,8 +3756,12 @@
             }
         },
         "securitySchemes": {
-            "sanctum": {
+            "bearerAuth": {
                 "type": "http",
+                "description": "Login with email and password to get the authentication token",
+                "name": "Token Based Authentication",
+                "in": "header",
+                "bearerFormat": "JWT",
                 "scheme": "bearer"
             }
         }
@@ -3612,8 +3780,16 @@
             "description": "API Endpoints for product management"
         },
         {
+            "name": "User",
+            "description": "API Endpoints for managing user details"
+        },
+        {
             "name": "Authentication",
             "description": "Authentication"
+        },
+        {
+            "name": "Admin Dashboard",
+            "description": "Admin Dashboard"
         },
         {
             "name": "Orders",
@@ -3634,10 +3810,6 @@
         {
             "name": "Stores",
             "description": "Stores"
-        },
-        {
-            "name": "User",
-            "description": "User"
         }
     ]
 }

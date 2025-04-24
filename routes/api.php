@@ -5,12 +5,14 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\OtpController;
-use Illuminate\Support\Facades\Mail;
-use App\Mail\VerifyEmail;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\StoreController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\Admin\DashboardController;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\VerifyEmail;
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -27,18 +29,57 @@ Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/verify-email', [AuthController::class, 'verifyEmail']);
 Route::get('/auth/verify-email/{email}/{otp}', [AuthController::class, 'verifyEmailLink']);
 Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/admin/login', [AuthController::class, 'adminLogin']);
 Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
-Route::post('/auth/admin/login', [AuthController::class, 'adminLogin']);
-// Product routes
+
+// Public Product routes
+Route::get('/products', [ProductController::class, 'index']);
 Route::post('/products/fetch', [ProductController::class, 'fetchProduct']);
 Route::get('/products/trending', [ProductController::class, 'trending']);
 
-// Cart routes
-Route::post('/cart/add', [CartController::class, 'addToCart']);
-Route::get('/cart', [CartController::class, 'getCart']);
-Route::patch('/cart/update', [CartController::class, 'updateCartItem']);
-Route::delete('/cart/remove', [CartController::class, 'removeCartItem']);
+// Protected routes
+Route::middleware(['auth:sanctum'])->group(function () {
+    // Auth routes
+    Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::get('/auth/user', [AuthController::class, 'user']);
+    
+    // Admin routes
+    Route::prefix('admin')->group(function () {
+        Route::get('/dashboard/stats', [AuthController::class, 'getStats']);
+    });
+
+
+
+    // Cart routes
+    Route::post('/cart/add', [CartController::class, 'addToCart']);
+    Route::get('/cart', [CartController::class, 'getCart']);
+    Route::patch('/cart/update', [CartController::class, 'updateCartItem']);
+    Route::delete('/cart/remove', [CartController::class, 'removeCartItem']);
+
+    // Store routes
+    Route::get('/stores', [StoreController::class, 'index']);
+    Route::post('/stores', [StoreController::class, 'store']);
+    Route::get('/stores/{id}', [StoreController::class, 'show']);
+    Route::put('/stores/{id}', [StoreController::class, 'update']);
+    Route::delete('/stores/{id}', [StoreController::class, 'destroy']);
+
+    // Order routes
+    Route::post('/orders', [OrderController::class, 'store']);
+    Route::get('/orders', [OrderController::class, 'index']);
+    Route::get('/orders/{id}', [OrderController::class, 'show']);
+    Route::put('/orders/{id}/cancel', [OrderController::class, 'cancel']);
+    Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+
+    // User routes
+    Route::get('/user', [UserController::class, 'getUser']);
+    Route::post('/user/update', [UserController::class, 'updateUser']);
+});
+
+// OTP routes
+Route::post('/otp/generate', [OtpController::class, 'generate']);
+Route::post('/otp/verify', [OtpController::class, 'verify']);
+Route::post('/otp/resend', [OtpController::class, 'resend']);
 
 // Test route for email
 Route::get('/test-email', function () {
@@ -55,17 +96,17 @@ Route::get('/test-email', function () {
     }
 });
 
-// OTP routes
-Route::post('/otp/generate', [OtpController::class, 'generate']);
-Route::post('/otp/verify', [OtpController::class, 'verify']);
-Route::post('/otp/resend', [OtpController::class, 'resend']);
 
 // Protected routes
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum'])->group(function () {
+    // Auth routes
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/user', [AuthController::class, 'user']);
     
-    // Product routes
+    // Admin routes
+    Route::prefix('admin')->group(function () {
+        Route::get('/dashboard/stats', [AuthController::class, 'getStats']);
+    });
 
     Route::get('/products/{id}', [ProductController::class, 'show']);
     Route::post('/products', [ProductController::class, 'store']);
@@ -73,10 +114,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/products/{id}', [ProductController::class, 'destroy']);
     Route::post('/products/scrape', [ProductController::class, 'scrapeProduct']);
 
-    
-}); 
-Route::get('/products', [ProductController::class, 'index']);
-Route::get('/products/{id}', [ProductController::class, 'show']);
+
+    // Cart routes
+    Route::post('/cart/add', [CartController::class, 'addToCart']);
+    Route::get('/cart', [CartController::class, 'getCart']);
+    Route::patch('/cart/update', [CartController::class, 'updateCartItem']);
+    Route::delete('/cart/remove', [CartController::class, 'removeCartItem']);
 
  // Store routes
     Route::get('/stores', [StoreController::class, 'index']);
@@ -116,6 +159,4 @@ Route::delete('/orders/{id}/documents/{document_id}', [OrderController::class, '
         Route::get('/user', [UserController::class, 'getUser']);
         Route::post('/user/update', [UserController::class, 'updateUser']);
     });
-    
-    Route::get('/user/get', [UserController::class, 'getUser']);
-    Route::post('/user/update', [UserController::class, 'updateUser']);
+});
