@@ -46,34 +46,45 @@ Route::middleware(['auth:sanctum'])->group(function () {
     
     // Admin routes
     Route::prefix('admin')->group(function () {
+        // Dashboard routes
         Route::get('/dashboard/stats', [AuthController::class, 'getStats']);
+        Route::get('/dashboard/recent-orders', [AuthController::class, 'recentOrders']);
+        Route::get('/dashboard/pending-actions', [AuthController::class, 'pendingActions']);
+        Route::get('/dashboard/analytics', [AuthController::class, 'orderAnalytics']);
+        Route::get('/dashboard/order-volume', [AuthController::class, 'orderVolume']);
+        Route::get('/dashboard/revenue-by-category', [AuthController::class, 'revenueByCategory']);
+
+        // Product management routes
+        Route::get('/products', [ProductController::class, 'index']);
+        Route::post('/products', [ProductController::class, 'store']);
+        Route::get('/products/{id}', [ProductController::class, 'show']);
+        Route::put('/products/{id}', [ProductController::class, 'update']);
+        Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+        Route::post('/products/scrape', [ProductController::class, 'scrapeProduct']);
     });
 
-
-
     // Cart routes
-    Route::post('/cart/add', [CartController::class, 'addToCart']);
-    Route::get('/cart', [CartController::class, 'getCart']);
-    Route::patch('/cart/update', [CartController::class, 'updateCartItem']);
-    Route::delete('/cart/remove', [CartController::class, 'removeCartItem']);
+    Route::prefix('cart')->group(function () {
+        Route::get('/', [CartController::class, 'index']);
+        Route::post('/add', [CartController::class, 'addToCart']);
+        Route::put('/update/{id}', [CartController::class, 'updateCartItem']);
+        Route::delete('/remove/{id}', [CartController::class, 'removeFromCart']);
+        Route::delete('/clear', [CartController::class, 'clearCart']);
+    });
 
-    // Store routes
-    Route::get('/stores', [StoreController::class, 'index']);
-    Route::post('/stores', [StoreController::class, 'store']);
-    Route::get('/stores/{id}', [StoreController::class, 'show']);
-    Route::put('/stores/{id}', [StoreController::class, 'update']);
-    Route::delete('/stores/{id}', [StoreController::class, 'destroy']);
-
-    // Order routes
-    Route::post('/orders', [OrderController::class, 'store']);
-    Route::get('/orders', [OrderController::class, 'index']);
-    Route::get('/orders/{id}', [OrderController::class, 'show']);
-    Route::put('/orders/{id}/cancel', [OrderController::class, 'cancel']);
-    Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
-
-    // User routes
-    Route::get('/user', [UserController::class, 'getUser']);
-    Route::post('/user/update', [UserController::class, 'updateUser']);
+    // Protected routes
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/user', function (Request $request) {
+            return $request->user();
+        });
+        
+        // Order routes
+        Route::post('/orders', [OrderController::class, 'store']);
+        Route::get('/orders', [OrderController::class, 'index']);
+        Route::get('/orders/{id}', [OrderController::class, 'show']);
+        Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+        Route::delete('/orders/{id}', [OrderController::class, 'cancel']);
+    });
 });
 
 // OTP routes
@@ -94,69 +105,4 @@ Route::get('/test-email', function () {
             'error' => $e->getMessage()
         ], 500);
     }
-});
-
-
-// Protected routes
-Route::middleware(['auth:sanctum'])->group(function () {
-    // Auth routes
-    Route::post('/auth/logout', [AuthController::class, 'logout']);
-    Route::get('/auth/user', [AuthController::class, 'user']);
-    
-    // Admin routes
-    Route::prefix('admin')->group(function () {
-        Route::get('/dashboard/stats', [AuthController::class, 'getStats']);
-    });
-
-    Route::get('/products/{id}', [ProductController::class, 'show']);
-    Route::post('/products', [ProductController::class, 'store']);
-    Route::put('/products/{id}', [ProductController::class, 'update']);
-    Route::delete('/products/{id}', [ProductController::class, 'destroy']);
-    Route::post('/products/scrape', [ProductController::class, 'scrapeProduct']);
-
-
-    // Cart routes
-    Route::post('/cart/add', [CartController::class, 'addToCart']);
-    Route::get('/cart', [CartController::class, 'getCart']);
-    Route::patch('/cart/update', [CartController::class, 'updateCartItem']);
-    Route::delete('/cart/remove', [CartController::class, 'removeCartItem']);
-
- // Store routes
-    Route::get('/stores', [StoreController::class, 'index']);
-    Route::post('/stores', [StoreController::class, 'store']);
-    Route::get('/stores/{id}', [StoreController::class, 'show']);
-    Route::put('/stores/{id}', [StoreController::class, 'update']);
-    Route::delete('/stores/{id}', [StoreController::class, 'destroy']);
-
-// Order routes
-    Route::post('/orders', [OrderController::class, 'store']);
-    Route::get('/orders', [OrderController::class, 'index']);
-    Route::get('/orders/{id}', [OrderController::class, 'show']);
-    Route::put('/orders/{id}/cancel', [OrderController::class, 'cancel']);
-    Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
-    Route::get('/orders-filter', [OrderController::class, 'filterOrders']);
-    Route::get('/orders-stats', [OrderController::class, 'getOrderStats']);
-    Route::get('/orders-recent', [OrderController::class, 'getRecentOrders']);
-    Route::get('/orders/{id}/details', [OrderController::class, 'getOrderDetails']);
-
-    // Order Updates
-Route::get('/orders/{id}/updates', [OrderController::class, 'getUpdates']);
-Route::post('/orders/{id}/updates', [OrderController::class, 'addUpdate']);
-Route::put('/orders/{id}/updates/{update_id}', [OrderController::class, 'updateUpdate']);
-Route::delete('/orders/{id}/updates/{update_id}', [OrderController::class, 'deleteUpdate']);
-
-// Order Messages
-Route::get('/orders/{id}/messages', [OrderController::class, 'getMessages']);
-Route::post('/orders/{id}/messages', [OrderController::class, 'addMessage']);
-Route::delete('/orders/{id}/messages/{message_id}', [OrderController::class, 'deleteMessage']);
-
-// Order Documents
-Route::get('/orders/{id}/documents', [OrderController::class, 'getDocuments']);
-Route::post('/orders/{id}/documents', [OrderController::class, 'uploadDocument']);
-Route::delete('/orders/{id}/documents/{document_id}', [OrderController::class, 'deleteDocument']);
-
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::get('/user', [UserController::class, 'getUser']);
-        Route::post('/user/update', [UserController::class, 'updateUser']);
-    });
 });
