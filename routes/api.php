@@ -29,7 +29,7 @@ Route::get('/auth/verify-email/{email}/{otp}', [AuthController::class, 'verifyEm
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
-
+Route::post('/auth/admin/login', [AuthController::class, 'adminLogin']);
 // Product routes
 Route::post('/products/fetch', [ProductController::class, 'fetchProduct']);
 Route::get('/products/trending', [ProductController::class, 'trending']);
