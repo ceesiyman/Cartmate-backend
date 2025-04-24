@@ -9,7 +9,6 @@ use App\Http\Controllers\CartController;
 use App\Http\Controllers\StoreController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\UserController;
-use App\Http\Controllers\Admin\DashboardController;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\VerifyEmail;
 
@@ -17,14 +16,9 @@ use App\Mail\VerifyEmail;
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
 */
 
-// Public routes
+// Public Auth Routes
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/verify-email', [AuthController::class, 'verifyEmail']);
 Route::get('/auth/verify-email/{email}/{otp}', [AuthController::class, 'verifyEmailLink']);
@@ -33,66 +27,17 @@ Route::post('/auth/admin/login', [AuthController::class, 'adminLogin']);
 Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
 
-// Public Product routes
+// Public Product Routes
 Route::get('/products', [ProductController::class, 'index']);
 Route::post('/products/fetch', [ProductController::class, 'fetchProduct']);
 Route::get('/products/trending', [ProductController::class, 'trending']);
 
-// Protected routes
-Route::middleware(['auth:sanctum'])->group(function () {
-    // Auth routes
-    Route::post('/auth/logout', [AuthController::class, 'logout']);
-    Route::get('/auth/user', [AuthController::class, 'user']);
-    
-    // Admin routes
-    Route::prefix('admin')->group(function () {
-        // Dashboard routes
-        Route::get('/dashboard/stats', [AuthController::class, 'getStats']);
-        Route::get('/dashboard/recent-orders', [AuthController::class, 'recentOrders']);
-        Route::get('/dashboard/pending-actions', [AuthController::class, 'pendingActions']);
-        Route::get('/dashboard/analytics', [AuthController::class, 'orderAnalytics']);
-        Route::get('/dashboard/order-volume', [AuthController::class, 'orderVolume']);
-        Route::get('/dashboard/revenue-by-category', [AuthController::class, 'revenueByCategory']);
-
-        // Product management routes
-        Route::get('/products', [ProductController::class, 'index']);
-        Route::post('/products', [ProductController::class, 'store']);
-        Route::get('/products/{id}', [ProductController::class, 'show']);
-        Route::put('/products/{id}', [ProductController::class, 'update']);
-        Route::delete('/products/{id}', [ProductController::class, 'destroy']);
-        Route::post('/products/scrape', [ProductController::class, 'scrapeProduct']);
-    });
-
-    // Cart routes
-    Route::prefix('cart')->group(function () {
-        Route::get('/', [CartController::class, 'index']);
-        Route::post('/add', [CartController::class, 'addToCart']);
-        Route::put('/update/{id}', [CartController::class, 'updateCartItem']);
-        Route::delete('/remove/{id}', [CartController::class, 'removeFromCart']);
-        Route::delete('/clear', [CartController::class, 'clearCart']);
-    });
-
-    // Protected routes
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::get('/user', function (Request $request) {
-            return $request->user();
-        });
-        
-        // Order routes
-        Route::post('/orders', [OrderController::class, 'store']);
-        Route::get('/orders', [OrderController::class, 'index']);
-        Route::get('/orders/{id}', [OrderController::class, 'show']);
-        Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
-        Route::delete('/orders/{id}', [OrderController::class, 'cancel']);
-    });
-});
-
-// OTP routes
+// OTP Routes
 Route::post('/otp/generate', [OtpController::class, 'generate']);
 Route::post('/otp/verify', [OtpController::class, 'verify']);
 Route::post('/otp/resend', [OtpController::class, 'resend']);
 
-// Test route for email
+// Test Email Route
 Route::get('/test-email', function () {
     try {
         $otp = '123456';
@@ -105,4 +50,75 @@ Route::get('/test-email', function () {
             'error' => $e->getMessage()
         ], 500);
     }
+});
+
+// Protected Routes
+Route::middleware(['auth:sanctum'])->group(function () {
+    // Auth
+    Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::get('/auth/user', [AuthController::class, 'user']);
+
+    // Admin
+    Route::prefix('admin')->group(function () {
+        Route::get('/dashboard/stats', [AuthController::class, 'getStats']);
+        Route::get('/dashboard/recent-orders', [AuthController::class, 'recentOrders']);
+        Route::get('/dashboard/pending-actions', [AuthController::class, 'pendingActions']);
+        Route::get('/dashboard/analytics', [AuthController::class, 'orderAnalytics']);
+        Route::get('/dashboard/order-volume', [AuthController::class, 'orderVolume']);
+        Route::get('/dashboard/revenue-by-category', [AuthController::class, 'revenueByCategory']);
+    });
+
+    // Product Management
+    Route::get('/products/{id}', [ProductController::class, 'show']);
+    Route::post('/products', [ProductController::class, 'store']);
+    Route::put('/products/{id}', [ProductController::class, 'update']);
+    Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+    Route::post('/products/scrape', [ProductController::class, 'scrapeProduct']);
+
+    // Cart
+    Route::post('/cart/add', [CartController::class, 'addToCart']);
+    Route::get('/cart', [CartController::class, 'getCart']);
+    Route::patch('/cart/update', [CartController::class, 'updateCartItem']);
+    Route::put('/cart/update/{id}', [CartController::class, 'updateCartItem']); // Optional alternative
+    Route::delete('/cart/remove', [CartController::class, 'removeCartItem']);
+    Route::delete('/cart/remove/{id}', [CartController::class, 'removeFromCart']);
+    Route::delete('/cart/clear', [CartController::class, 'clearCart']);
+
+    // Store
+    Route::get('/stores', [StoreController::class, 'index']);
+    Route::post('/stores', [StoreController::class, 'store']);
+    Route::get('/stores/{id}', [StoreController::class, 'show']);
+    Route::put('/stores/{id}', [StoreController::class, 'update']);
+    Route::delete('/stores/{id}', [StoreController::class, 'destroy']);
+
+    // Orders
+    Route::post('/orders', [OrderController::class, 'store']);
+    Route::get('/orders', [OrderController::class, 'index']);
+    Route::get('/orders/{id}', [OrderController::class, 'show']);
+    Route::put('/orders/{id}/cancel', [OrderController::class, 'cancel']);
+    Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+    Route::get('/orders-filter', [OrderController::class, 'filterOrders']);
+    Route::get('/orders-stats', [OrderController::class, 'getOrderStats']);
+    Route::get('/orders-recent', [OrderController::class, 'getRecentOrders']);
+    Route::get('/orders/{id}/details', [OrderController::class, 'getOrderDetails']);
+
+    // Order Updates
+    Route::get('/orders/{id}/updates', [OrderController::class, 'getUpdates']);
+    Route::post('/orders/{id}/updates', [OrderController::class, 'addUpdate']);
+    Route::put('/orders/{id}/updates/{update_id}', [OrderController::class, 'updateUpdate']);
+    Route::delete('/orders/{id}/updates/{update_id}', [OrderController::class, 'deleteUpdate']);
+
+    // Order Messages
+    Route::get('/orders/{id}/messages', [OrderController::class, 'getMessages']);
+    Route::post('/orders/{id}/messages', [OrderController::class, 'addMessage']);
+    Route::delete('/orders/{id}/messages/{message_id}', [OrderController::class, 'deleteMessage']);
+
+    // Order Documents
+    Route::get('/orders/{id}/documents', [OrderController::class, 'getDocuments']);
+    Route::post('/orders/{id}/documents', [OrderController::class, 'uploadDocument']);
+    Route::delete('/orders/{id}/documents/{document_id}', [OrderController::class, 'deleteDocument']);
+
+    // User
+    Route::get('/user', [UserController::class, 'getUser']);
+    Route::post('/user/update', [UserController::class, 'updateUser']);
 });
