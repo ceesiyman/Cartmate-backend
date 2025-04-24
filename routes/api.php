@@ -9,6 +9,7 @@ use App\Http\Controllers\CartController;
 use App\Http\Controllers\StoreController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\CustomerController;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\VerifyEmail;
 
@@ -66,6 +67,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/dashboard/analytics', [AuthController::class, 'orderAnalytics']);
         Route::get('/dashboard/order-volume', [AuthController::class, 'orderVolume']);
         Route::get('/dashboard/revenue-by-category', [AuthController::class, 'revenueByCategory']);
+         Route::get('/customers', [CustomerController::class, 'index']);
+        Route::get('/customers/{id}', [CustomerController::class, 'show']);
+
     });
 
     // Product Management
