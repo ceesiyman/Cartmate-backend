@@ -721,7 +721,7 @@ class AuthController extends Controller
      */
     public function getStats(Request $request)
     {
-        // Verify admin token
+        // Check if user is admin using token
         $user = $request->user();
         if (!$user || $user->role !== 'ADMIN') {
             return response()->json([
@@ -805,5 +805,155 @@ class AuthController extends Controller
             return $newValue > 0 ? 100 : 0;
         }
         return round((($newValue - $oldValue) / $oldValue) * 100);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/admin/dashboard/recent-orders",
+     *     summary="Get recent orders for admin dashboard",
+     *     tags={"Admin Dashboard"},
+     *      security={{"bearerAuth": {}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of recent orders",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="string", example="ORD-2024-001"),
+     *                     @OA\Property(property="customer", type="string", example="John Doe"),
+     *                     @OA\Property(property="date", type="string", example="April 1, 2024"),
+     *                     @OA\Property(property="amount", type="number", format="float", example=99.99),
+     *                     @OA\Property(property="status", type="string", example="processing"),
+     *                     @OA\Property(property="items", type="integer", example=2),
+     *                     @OA\Property(property="hasIssue", type="boolean", example=false)
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized"
+     *     )
+     * )
+     */
+    public function recentOrders(Request $request)
+    {
+        // Check if user is admin using token
+        $user = $request->user();
+        if (!$user || $user->role !== 'ADMIN') {
+            return response()->json([
+                'message' => 'Unauthorized. Admin access only.'
+            ], 403);
+        }
+
+        $orders = Order::with(['user', 'items'])
+            ->latest()
+            ->take(5)
+            ->get()
+            ->map(function ($order) {
+                return [
+                    'id' => $order->order_number,
+                    'customer' => $order->user ? $order->user->name : 'Unknown Customer',
+                    'date' => $order->created_at->format('F j, Y'),
+                    'amount' => $order->total_amount,
+                    'status' => $order->status,
+                    'items' => $order->items->count(),
+                    'hasIssue' => $order->status === 'cancelled' || $order->status === 'pending',
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => $orders
+        ]);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/admin/dashboard/pending-actions",
+     *     summary="Get pending actions for admin dashboard",
+     *     tags={"Admin Dashboard"},
+     *      security={{"bearerAuth": {}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of pending actions",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="string", example="ACT-2024-001"),
+     *                     @OA\Property(property="type", type="string", example="order_issue"),
+     *                     @OA\Property(property="title", type="string", example="Order requires attention"),
+     *                     @OA\Property(property="description", type="string", example="Order #ORD-2024-001 has been pending for more than 24 hours"),
+     *                     @OA\Property(property="priority", type="string", example="high"),
+     *                     @OA\Property(property="created_at", type="string", example="2024-04-01T10:00:00Z"),
+     *                     @OA\Property(property="related_id", type="string", example="ORD-2024-001")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized"
+     *     )
+     * )
+     */
+    public function pendingActions(Request $request)
+    {
+        // Check if user is admin using token
+        $user = $request->user();
+        if (!$user || $user->role !== 'ADMIN') {
+            return response()->json([
+                'message' => 'Unauthorized. Admin access only.'
+            ], 403);
+        }
+
+        // Get pending orders that need attention
+        $pendingOrders = Order::where('status', 'pending')
+            ->where('created_at', '<=', now()->subHours(24))
+            ->get()
+            ->map(function ($order) {
+                return [
+                    'id' => 'ACT-' . $order->id,
+                    'type' => 'order_issue',
+                    'title' => 'Order requires attention',
+                    'description' => "Order #{$order->order_number} has been pending for more than 24 hours",
+                    'priority' => 'high',
+                    'created_at' => $order->created_at->toIso8601String(),
+                    'related_id' => $order->order_number
+                ];
+            });
+
+        // Get cancelled orders that need review
+        $cancelledOrders = Order::where('status', 'cancelled')
+            ->where('created_at', '>=', now()->subHours(48))
+            ->get()
+            ->map(function ($order) {
+                return [
+                    'id' => 'ACT-' . $order->id,
+                    'type' => 'order_cancelled',
+                    'title' => 'Order cancelled',
+                    'description' => "Order #{$order->order_number} was cancelled by the customer",
+                    'priority' => 'medium',
+                    'created_at' => $order->created_at->toIso8601String(),
+                    'related_id' => $order->order_number
+                ];
+            });
+
+        // Combine all actions and sort by priority and creation date
+        $actions = $pendingOrders->concat($cancelledOrders)
+            ->sortByDesc('priority')
+            ->sortByDesc('created_at')
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => $actions
+        ]);
     }
 } 

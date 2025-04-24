@@ -48,6 +48,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Admin routes
     Route::prefix('admin')->group(function () {
         Route::get('/dashboard/stats', [AuthController::class, 'getStats']);
+        Route::get('/dashboard/recent-orders', [AuthController::class, 'recentOrders']);
+        Route::get('/dashboard/pending-actions', [AuthController::class, 'pendingActions']);
     });
 
     // Protected Product routes
@@ -99,4 +101,9 @@ Route::get('/test-email', function () {
             'error' => $e->getMessage()
         ], 500);
     }
+});
+
+Route::middleware(['auth:sanctum', 'admin'])->group(function () {
+ 
+   
 });
