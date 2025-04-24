@@ -794,6 +794,247 @@
                 ]
             }
         },
+        "/api/admin/dashboard/recent-orders": {
+            "get": {
+                "tags": [
+                    "Admin Dashboard"
+                ],
+                "summary": "Get recent orders for admin dashboard",
+                "operationId": "e5add9a4ef11477dfc02e8a0777c9486",
+                "responses": {
+                    "200": {
+                        "description": "List of recent orders",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string",
+                                                        "example": "ORD-2024-001"
+                                                    },
+                                                    "customer": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "date": {
+                                                        "type": "string",
+                                                        "example": "April 1, 2024"
+                                                    },
+                                                    "amount": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 99.99
+                                                    },
+                                                    "status": {
+                                                        "type": "string",
+                                                        "example": "processing"
+                                                    },
+                                                    "items": {
+                                                        "type": "integer",
+                                                        "example": 2
+                                                    },
+                                                    "hasIssue": {
+                                                        "type": "boolean",
+                                                        "example": false
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin/dashboard/pending-actions": {
+            "get": {
+                "tags": [
+                    "Admin Dashboard"
+                ],
+                "summary": "Get pending actions for admin dashboard",
+                "operationId": "b8f7c0a7cdf810d5be9d82701a455723",
+                "responses": {
+                    "200": {
+                        "description": "List of pending actions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string",
+                                                        "example": "ACT-2024-001"
+                                                    },
+                                                    "type": {
+                                                        "type": "string",
+                                                        "example": "order_issue"
+                                                    },
+                                                    "title": {
+                                                        "type": "string",
+                                                        "example": "Order requires attention"
+                                                    },
+                                                    "description": {
+                                                        "type": "string",
+                                                        "example": "Order #ORD-2024-001 has been pending for more than 24 hours"
+                                                    },
+                                                    "priority": {
+                                                        "type": "string",
+                                                        "example": "high"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "example": "2024-04-01T10:00:00Z"
+                                                    },
+                                                    "related_id": {
+                                                        "type": "string",
+                                                        "example": "ORD-2024-001"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin/dashboard/analytics": {
+            "get": {
+                "tags": [
+                    "Admin Dashboard"
+                ],
+                "summary": "Get order analytics for admin dashboard",
+                "operationId": "2cd63a67e3544dbe3a8d0e69229cb5f7",
+                "parameters": [
+                    {
+                        "name": "time_range",
+                        "in": "query",
+                        "description": "Time range for analytics",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "week",
+                            "enum": [
+                                "week",
+                                "month",
+                                "year"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Order analytics data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "orderVolume": {
+                                            "properties": {
+                                                "labels": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "datasets": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "data": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "integer"
+                                                                }
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "revenueByCategory": {
+                                            "properties": {
+                                                "labels": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "datasets": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "data": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "integer"
+                                                                }
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/cart/add": {
             "post": {
                 "tags": [

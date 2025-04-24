@@ -31,13 +31,15 @@ class Product extends Model
         'similar_products',
         'features',           // New
         'specifications',     // New
-        'brand',             // New
-        'category',          // New
+        'brand',    
         'rating',            // New
         'review_count',      // New
         'in_stock',          // New
         'sku',               // New
-        'additional_info'    // New
+        'additional_info',   // New
+        'store_id',
+        'category_id',
+        'is_active'
     ];
 
     /**
@@ -59,5 +61,24 @@ class Product extends Model
         'specifications' => 'array',
         'additional_info' => 'array',
         'in_stock' => 'boolean',
+        'price' => 'decimal:2',
+        'is_active' => 'boolean'
     ];
+
+    /**
+     * Get the store that owns the product.
+     */
+    public function store()
+    {
+        return $this->belongsTo(Store::class);
+    }
+
+    /**
+     * Get the category that owns the product.
+     */
+    public function category()
+    {
+        return $this->belongsTo(Category::class);
+    }
+    
 } 
