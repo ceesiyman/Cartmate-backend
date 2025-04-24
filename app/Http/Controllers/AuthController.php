@@ -16,6 +16,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
 use App\Models\Order;
+use Illuminate\Support\Facades\DB;
 
 
 class AuthController extends Controller
@@ -721,7 +722,7 @@ class AuthController extends Controller
      */
     public function getStats(Request $request)
     {
-        // Verify admin token
+        // Check if user is admin using token
         $user = $request->user();
         if (!$user || $user->role !== 'ADMIN') {
             return response()->json([
@@ -805,5 +806,304 @@ class AuthController extends Controller
             return $newValue > 0 ? 100 : 0;
         }
         return round((($newValue - $oldValue) / $oldValue) * 100);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/admin/dashboard/recent-orders",
+     *     summary="Get recent orders for admin dashboard",
+     *     tags={"Admin Dashboard"},
+     *      security={{"bearerAuth": {}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of recent orders",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="string", example="ORD-2024-001"),
+     *                     @OA\Property(property="customer", type="string", example="John Doe"),
+     *                     @OA\Property(property="date", type="string", example="April 1, 2024"),
+     *                     @OA\Property(property="amount", type="number", format="float", example=99.99),
+     *                     @OA\Property(property="status", type="string", example="processing"),
+     *                     @OA\Property(property="items", type="integer", example=2),
+     *                     @OA\Property(property="hasIssue", type="boolean", example=false)
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized"
+     *     )
+     * )
+     */
+    public function recentOrders(Request $request)
+    {
+        // Check if user is admin using token
+        $user = $request->user();
+        if (!$user || $user->role !== 'ADMIN') {
+            return response()->json([
+                'message' => 'Unauthorized. Admin access only.'
+            ], 403);
+        }
+
+        $orders = Order::with(['user', 'items'])
+            ->latest()
+            ->take(5)
+            ->get()
+            ->map(function ($order) {
+                return [
+                    'id' => $order->order_number,
+                    'customer' => $order->user ? $order->user->name : 'Unknown Customer',
+                    'date' => $order->created_at->format('F j, Y'),
+                    'amount' => $order->total_amount,
+                    'status' => $order->status,
+                    'items' => $order->items->count(),
+                    'hasIssue' => $order->status === 'cancelled' || $order->status === 'pending',
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => $orders
+        ]);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/admin/dashboard/pending-actions",
+     *     summary="Get pending actions for admin dashboard",
+     *     tags={"Admin Dashboard"},
+     *      security={{"bearerAuth": {}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of pending actions",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="string", example="ACT-2024-001"),
+     *                     @OA\Property(property="type", type="string", example="order_issue"),
+     *                     @OA\Property(property="title", type="string", example="Order requires attention"),
+     *                     @OA\Property(property="description", type="string", example="Order #ORD-2024-001 has been pending for more than 24 hours"),
+     *                     @OA\Property(property="priority", type="string", example="high"),
+     *                     @OA\Property(property="created_at", type="string", example="2024-04-01T10:00:00Z"),
+     *                     @OA\Property(property="related_id", type="string", example="ORD-2024-001")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized"
+     *     )
+     * )
+     */
+    public function pendingActions(Request $request)
+    {
+        // Check if user is admin using token
+        $user = $request->user();
+        if (!$user || $user->role !== 'ADMIN') {
+            return response()->json([
+                'message' => 'Unauthorized. Admin access only.'
+            ], 403);
+        }
+
+        // Get pending orders that need attention
+        $pendingOrders = Order::where('status', 'pending')
+            ->where('created_at', '<=', now()->subHours(24))
+            ->get()
+            ->map(function ($order) {
+                return [
+                    'id' => 'ACT-' . $order->id,
+                    'type' => 'order_issue',
+                    'title' => 'Order requires attention',
+                    'description' => "Order #{$order->order_number} has been pending for more than 24 hours",
+                    'priority' => 'high',
+                    'created_at' => $order->created_at->toIso8601String(),
+                    'related_id' => $order->order_number
+                ];
+            });
+
+        // Get cancelled orders that need review
+        $cancelledOrders = Order::where('status', 'cancelled')
+            ->where('created_at', '>=', now()->subHours(48))
+            ->get()
+            ->map(function ($order) {
+                return [
+                    'id' => 'ACT-' . $order->id,
+                    'type' => 'order_cancelled',
+                    'title' => 'Order cancelled',
+                    'description' => "Order #{$order->order_number} was cancelled by the customer",
+                    'priority' => 'medium',
+                    'created_at' => $order->created_at->toIso8601String(),
+                    'related_id' => $order->order_number
+                ];
+            });
+
+        // Combine all actions and sort by priority and creation date
+        $actions = $pendingOrders->concat($cancelledOrders)
+            ->sortByDesc('priority')
+            ->sortByDesc('created_at')
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => $actions
+        ]);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/admin/dashboard/analytics",
+     *     summary="Get order analytics for admin dashboard",
+     *     tags={"Admin Dashboard"},
+     *     security={{"bearerAuth": {}}},
+     *     @OA\Parameter(
+     *         name="time_range",
+     *         in="query",
+     *         description="Time range for analytics",
+     *         required=false,
+     *         @OA\Schema(
+     *             type="string",
+     *             enum={"week", "month", "year"},
+     *             default="week"
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Order analytics data",
+     *         @OA\JsonContent(
+     *             @OA\Property(
+     *                 property="orderVolume",
+     *                 type="object",
+     *                 @OA\Property(property="labels", type="array", @OA\Items(type="string")),
+     *                 @OA\Property(
+     *                     property="datasets",
+     *                     type="array",
+     *                     @OA\Items(
+     *                         type="object",
+     *                         @OA\Property(property="data", type="array", @OA\Items(type="integer"))
+     *                     )
+     *                 )
+     *             ),
+     *             @OA\Property(
+     *                 property="revenueByCategory",
+     *                 type="object",
+     *                 @OA\Property(property="labels", type="array", @OA\Items(type="string")),
+     *                 @OA\Property(
+     *                     property="datasets",
+     *                     type="array",
+     *                     @OA\Items(
+     *                         type="object",
+     *                         @OA\Property(property="data", type="array", @OA\Items(type="integer"))
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized"
+     *     )
+     * )
+     */
+    public function orderAnalytics(Request $request)
+    {
+        // Check if user is admin using token
+        $user = $request->user();
+        if (!$user || $user->role !== 'ADMIN') {
+            return response()->json([
+                'message' => 'Unauthorized. Admin access only.'
+            ], 403);
+        }
+
+        $timeRange = $request->query('time_range', 'week');
+        $now = Carbon::now();
+
+        // Get date range based on time_range parameter
+        switch ($timeRange) {
+            case 'month':
+                $startDate = $now->copy()->startOfMonth();
+                $endDate = $now->copy()->endOfMonth();
+                $interval = 'day';
+                $format = 'D';
+                break;
+            case 'year':
+                $startDate = $now->copy()->startOfYear();
+                $endDate = $now->copy()->endOfYear();
+                $interval = 'month';
+                $format = 'M';
+                break;
+            default: // week
+                $startDate = $now->copy()->startOfWeek();
+                $endDate = $now->copy()->endOfWeek();
+                $interval = 'day';
+                $format = 'D';
+        }
+
+        // Get order volume data
+        $orders = Order::whereBetween('created_at', [$startDate, $endDate])
+            ->get()
+            ->groupBy(function ($order) use ($interval) {
+                return $order->created_at->startOf($interval)->format('Y-m-d');
+            });
+
+        $orderVolumeLabels = [];
+        $orderVolumeData = [];
+
+        $currentDate = $startDate->copy();
+        while ($currentDate <= $endDate) {
+            $dateKey = $currentDate->format('Y-m-d');
+            $orderVolumeLabels[] = $currentDate->format($format);
+            $orderVolumeData[] = $orders->has($dateKey) ? $orders[$dateKey]->count() : 0;
+            $currentDate->add(1, $interval);
+        }
+
+        // Get revenue by category
+        $revenueByCategory = Order::whereBetween('orders.created_at', [$startDate, $endDate])
+            ->where('orders.status', 'completed')
+            ->join('order_items', 'orders.id', '=', 'order_items.order_id')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->leftJoin('categories', 'products.category_id', '=', 'categories.id')
+            ->select(
+                'categories.name as category_name',
+                DB::raw('ROUND(SUM(order_items.price * order_items.quantity)) as revenue')
+            )
+            ->groupBy('categories.name')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'category' => $item->category_name ?? 'Uncategorized',
+                    'revenue' => (int)$item->revenue
+                ];
+            });
+
+        // Format the data for the response
+        $formattedData = [
+            'orderVolume' => [
+                'labels' => $orderVolumeLabels,
+                'datasets' => [
+                    [
+                        'data' => $orderVolumeData
+                    ]
+                ]
+            ],
+            'revenueByCategory' => [
+                'labels' => $revenueByCategory->pluck('category')->toArray(),
+                'datasets' => [
+                    [
+                        'data' => $revenueByCategory->pluck('revenue')->toArray()
+                    ]
+                ]
+            ]
+        ];
+
+        return response()->json($formattedData);
     }
 } 
