@@ -50,6 +50,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/dashboard/stats', [AuthController::class, 'getStats']);
         Route::get('/dashboard/recent-orders', [AuthController::class, 'recentOrders']);
         Route::get('/dashboard/pending-actions', [AuthController::class, 'pendingActions']);
+        Route::get('/dashboard/analytics', [AuthController::class, 'orderAnalytics']);
     });
 
     // Protected Product routes
