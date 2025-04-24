@@ -16,6 +16,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
 use App\Models\Order;
+use Illuminate\Support\Facades\DB;
 
 
 class AuthController extends Controller
@@ -955,5 +956,154 @@ class AuthController extends Controller
             'success' => true,
             'data' => $actions
         ]);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/admin/dashboard/analytics",
+     *     summary="Get order analytics for admin dashboard",
+     *     tags={"Admin Dashboard"},
+     *     security={{"bearerAuth": {}}},
+     *     @OA\Parameter(
+     *         name="time_range",
+     *         in="query",
+     *         description="Time range for analytics",
+     *         required=false,
+     *         @OA\Schema(
+     *             type="string",
+     *             enum={"week", "month", "year"},
+     *             default="week"
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Order analytics data",
+     *         @OA\JsonContent(
+     *             @OA\Property(
+     *                 property="orderVolume",
+     *                 type="object",
+     *                 @OA\Property(property="labels", type="array", @OA\Items(type="string")),
+     *                 @OA\Property(
+     *                     property="datasets",
+     *                     type="array",
+     *                     @OA\Items(
+     *                         type="object",
+     *                         @OA\Property(property="data", type="array", @OA\Items(type="integer"))
+     *                     )
+     *                 )
+     *             ),
+     *             @OA\Property(
+     *                 property="revenueByCategory",
+     *                 type="object",
+     *                 @OA\Property(property="labels", type="array", @OA\Items(type="string")),
+     *                 @OA\Property(
+     *                     property="datasets",
+     *                     type="array",
+     *                     @OA\Items(
+     *                         type="object",
+     *                         @OA\Property(property="data", type="array", @OA\Items(type="integer"))
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized"
+     *     )
+     * )
+     */
+    public function orderAnalytics(Request $request)
+    {
+        // Check if user is admin using token
+        $user = $request->user();
+        if (!$user || $user->role !== 'ADMIN') {
+            return response()->json([
+                'message' => 'Unauthorized. Admin access only.'
+            ], 403);
+        }
+
+        $timeRange = $request->query('time_range', 'week');
+        $now = Carbon::now();
+
+        // Get date range based on time_range parameter
+        switch ($timeRange) {
+            case 'month':
+                $startDate = $now->copy()->startOfMonth();
+                $endDate = $now->copy()->endOfMonth();
+                $interval = 'day';
+                $format = 'D';
+                break;
+            case 'year':
+                $startDate = $now->copy()->startOfYear();
+                $endDate = $now->copy()->endOfYear();
+                $interval = 'month';
+                $format = 'M';
+                break;
+            default: // week
+                $startDate = $now->copy()->startOfWeek();
+                $endDate = $now->copy()->endOfWeek();
+                $interval = 'day';
+                $format = 'D';
+        }
+
+        // Get order volume data
+        $orders = Order::whereBetween('created_at', [$startDate, $endDate])
+            ->get()
+            ->groupBy(function ($order) use ($interval) {
+                return $order->created_at->startOf($interval)->format('Y-m-d');
+            });
+
+        $orderVolumeLabels = [];
+        $orderVolumeData = [];
+
+        $currentDate = $startDate->copy();
+        while ($currentDate <= $endDate) {
+            $dateKey = $currentDate->format('Y-m-d');
+            $orderVolumeLabels[] = $currentDate->format($format);
+            $orderVolumeData[] = $orders->has($dateKey) ? $orders[$dateKey]->count() : 0;
+            $currentDate->add(1, $interval);
+        }
+
+        // Get revenue by category
+        $revenueByCategory = Order::whereBetween('orders.created_at', [$startDate, $endDate])
+            ->where('orders.status', 'completed')
+            ->join('order_items', 'orders.id', '=', 'order_items.order_id')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->leftJoin('categories', 'products.category_id', '=', 'categories.id')
+            ->select(
+                'categories.name as category_name',
+                DB::raw('ROUND(SUM(order_items.price * order_items.quantity)) as revenue')
+            )
+            ->groupBy('categories.name')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'category' => $item->category_name ?? 'Uncategorized',
+                    'revenue' => (int)$item->revenue
+                ];
+            });
+
+        // Format the data for the response
+        $formattedData = [
+            'orderVolume' => [
+                'labels' => $orderVolumeLabels,
+                'datasets' => [
+                    [
+                        'data' => $orderVolumeData
+                    ]
+                ]
+            ],
+            'revenueByCategory' => [
+                'labels' => $revenueByCategory->pluck('category')->toArray(),
+                'datasets' => [
+                    [
+                        'data' => $revenueByCategory->pluck('revenue')->toArray()
+                    ]
+                ]
+            ]
+        ];
+
+        return response()->json($formattedData);
     }
 } 
