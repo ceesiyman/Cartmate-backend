@@ -72,8 +72,8 @@ class ProductController extends Controller
             // Check if product already exists with this URL
             $existingProduct = Product::where('original_url', $url)->first();
             if ($existingProduct) {
-            return response()->json([
-                'success' => true,
+                return response()->json([
+                    'success' => true,
                     'message' => 'Product already exists',
                     'data' => $existingProduct
                 ]);
@@ -135,6 +135,39 @@ class ProductController extends Controller
             if ($platform === 'aliexpress') {
                 $headers['Cookie'] = 'aep_usuc_f=site=usa&c_tp=USD&region=US&b_locale=en_US&ae_u_c=1';
                 $headers['Accept-Language'] = 'en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7';
+            } elseif ($platform === 'etsy') {
+                $headers = array_merge($headers, [
+                    'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                    'Accept-Language' => 'en-US,en;q=0.9',
+                    'Cache-Control' => 'no-cache',
+                    'Pragma' => 'no-cache',
+                    'Sec-CH-UA-Full-Version-List' => '"Not_A Brand";v="8.0.0.0", "Chromium";v="120.0.0.0", "Google Chrome";v="120.0.0.0"',
+                    'Sec-CH-UA-Bitness' => '"64"',
+                    'Sec-CH-UA-Model' => '""',
+                    'Sec-CH-UA-Platform-Version' => '"15.0.0"',
+                    'DNT' => '1',
+                    'Referer' => 'https://www.google.com/',
+                    'Cookie' => 'uaid=' . uniqid() . '; user_prefs=CgkIChIGcHJlZnMaAA; fve=' . time()
+                ]);
+            } elseif ($platform === 'walmart') {
+                $headers = array_merge($headers, [
+                    'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                    'Accept-Language' => 'en-US,en;q=0.9',
+                    'Accept-Encoding' => 'gzip, deflate, br',
+                    'Connection' => 'keep-alive',
+                    'Upgrade-Insecure-Requests' => '1',
+                    'Sec-Fetch-Dest' => 'document',
+                    'Sec-Fetch-Mode' => 'navigate',
+                    'Sec-Fetch-Site' => 'none',
+                    'Sec-Fetch-User' => '?1',
+                    'Cache-Control' => 'max-age=0',
+                    'sec-ch-ua' => '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+                    'sec-ch-ua-mobile' => '?0',
+                    'sec-ch-ua-platform' => '"Windows"',
+                    'DNT' => '1',
+                    'Referer' => 'https://www.google.com/',
+                    'Cookie' => 'customerId=' . uniqid() . '; storeId=0; marketId=1;'
+                ]);
             }
             
             // Make the HTTP request with options
@@ -174,6 +207,56 @@ class ProductController extends Controller
                 'automated requests',
                 'suspicious activity'
             ];
+            
+            // Add platform-specific bot detection phrases
+            if ($platform === 'etsy') {
+                $botDetectionPhrases = array_merge($botDetectionPhrases, [
+                    'Sorry, we\'re experiencing technical difficulties',
+                    'Your request was blocked',
+                    'Please confirm you are a human',
+                    'We\'ve detected unusual activity',
+                    'temporarily unavailable',
+                    'Too Many Requests',
+                    'rate limit exceeded',
+                    'unusual traffic pattern',
+                    'automated browsing behavior',
+                    'verify your identity',
+                    'our security system has been activated',
+                    'our site is currently unavailable in your region'
+                ]);
+                
+                // Check for Cloudflare protection
+                if (str_contains($html, 'cf-browser-verification') || 
+                    str_contains($html, 'cf-challenge') || 
+                    str_contains($html, '_cf_chl_opt')) {
+                    Log::warning("Cloudflare protection detected for Etsy URL: $url");
+                    throw new \Exception("This website is currently using enhanced protection. Please try again later.");
+                }
+            } elseif ($platform === 'walmart') {
+                $botDetectionPhrases = array_merge($botDetectionPhrases, [
+                    'Please verify you are a human',
+                    'Security Check',
+                    'Access Denied',
+                    'Bot Protection',
+                    'unusual activity',
+                    'suspicious activity',
+                    'automated access',
+                    'security verification',
+                    'verification required',
+                    'verify you are human',
+                    'verify you are not a robot',
+                    'verify you are not automated',
+                    'verify you are not a bot'
+                ]);
+                
+                // Check for Walmart-specific bot detection
+                if (str_contains($html, 'security check') || 
+                    str_contains($html, 'verify you are human') || 
+                    str_contains($html, 'bot protection')) {
+                    Log::warning("Walmart bot protection detected for URL: $url");
+                    throw new \Exception("Walmart is currently blocking automated access. Please try again later or use a different approach.");
+                }
+            }
             
             foreach ($botDetectionPhrases as $phrase) {
                 if (str_contains($html, $phrase)) {
@@ -321,77 +404,76 @@ class ProductController extends Controller
      * )
      */
     public function trending(Request $request)
-{
-    $limit = $request->input('limit', 4);
+    {
+        $limit = $request->input('limit', 4);
 
-    $trendingProducts = Product::select([
-        'products.id',
-        'products.name',
-        'products.original_price',
-        'products.discounted_price',
-        'products.image',
-        'products.description',
-        'products.store',
-        'products.original_url',
-        'products.shipping',
-        'products.customs',
-        'products.service_fee',
-        'products.vat',
-        'products.total_price',
-        'products.images',
-        'products.similar_products',
-        'products.features',
-        'products.specifications',
-        'products.brand',
-        'products.category',
-        'products.rating',
-        'products.review_count',
-        'products.in_stock',
-        'products.sku',
-        'products.additional_info',
-        'products.created_at',
-        'products.updated_at'
-    ])
-    ->selectRaw('COUNT(carts.id) as cart_count')
-    ->leftJoin('carts', 'products.id', '=', 'carts.product_id')
-    ->groupBy([
-        'products.id',
-        'products.name',
-        'products.original_price',
-        'products.discounted_price',
-        'products.image',
-        'products.description',
-        'products.store',
-        'products.original_url',
-        'products.shipping',
-        'products.customs',
-        'products.service_fee',
-        'products.vat',
-        'products.total_price',
-        'products.images',
-        'products.similar_products',
-        'products.features',
-        'products.specifications',
-        'products.brand',
-        'products.category',
-        'products.rating',
-        'products.review_count',
-        'products.in_stock',
-        'products.sku',
-        'products.additional_info',
-        'products.created_at',
-        'products.updated_at'
-    ])
-    ->orderBy('cart_count', 'desc')
-    ->limit($limit)
-    ->get();
+        $trendingProducts = Product::select([
+            'products.id',
+            'products.name',
+            'products.original_price',
+            'products.discounted_price',
+            'products.image',
+            'products.description',
+            'products.store',
+            'products.original_url',
+            'products.shipping',
+            'products.customs',
+            'products.service_fee',
+            'products.vat',
+            'products.total_price',
+            'products.images',
+            'products.similar_products',
+            'products.features',
+            'products.specifications',
+            'products.brand',
+            'products.category',
+            'products.rating',
+            'products.review_count',
+            'products.in_stock',
+            'products.sku',
+            'products.additional_info',
+            'products.created_at',
+            'products.updated_at'
+        ])
+        ->selectRaw('COUNT(carts.id) as cart_count')
+        ->leftJoin('carts', 'products.id', '=', 'carts.product_id')
+        ->groupBy([
+            'products.id',
+            'products.name',
+            'products.original_price',
+            'products.discounted_price',
+            'products.image',
+            'products.description',
+            'products.store',
+            'products.original_url',
+            'products.shipping',
+            'products.customs',
+            'products.service_fee',
+            'products.vat',
+            'products.total_price',
+            'products.images',
+            'products.similar_products',
+            'products.features',
+            'products.specifications',
+            'products.brand',
+            'products.category',
+            'products.rating',
+            'products.review_count',
+            'products.in_stock',
+            'products.sku',
+            'products.additional_info',
+            'products.created_at',
+            'products.updated_at'
+        ])
+        ->orderBy('cart_count', 'desc')
+        ->limit($limit)
+        ->get();
 
-    return response()->json([
-        'success' => true,
-        'data' => $trendingProducts
-    ]);
-}
-
+        return response()->json([
+            'success' => true,
+            'data' => $trendingProducts
+        ]);
+    }
 
     /**
      * Scrape product details from a URL
@@ -458,7 +540,6 @@ class ProductController extends Controller
             $headers['Cookie'] = 'aep_usuc_f=site=usa&c_tp=USD&region=US&b_locale=en_US&ae_u_c=1';
             $headers['Accept-Language'] = 'en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7';
         } elseif ($platform === 'etsy') {
-            // Enhanced Etsy-specific headers
             $headers = array_merge($headers, [
                 'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
                 'Accept-Language' => 'en-US,en;q=0.9',
@@ -471,6 +552,25 @@ class ProductController extends Controller
                 'DNT' => '1',
                 'Referer' => 'https://www.google.com/',
                 'Cookie' => 'uaid=' . uniqid() . '; user_prefs=CgkIChIGcHJlZnMaAA; fve=' . time()
+            ]);
+        } elseif ($platform === 'walmart') {
+            $headers = array_merge($headers, [
+                'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                'Accept-Language' => 'en-US,en;q=0.9',
+                'Accept-Encoding' => 'gzip, deflate, br',
+                'Connection' => 'keep-alive',
+                'Upgrade-Insecure-Requests' => '1',
+                'Sec-Fetch-Dest' => 'document',
+                'Sec-Fetch-Mode' => 'navigate',
+                'Sec-Fetch-Site' => 'none',
+                'Sec-Fetch-User' => '?1',
+                'Cache-Control' => 'max-age=0',
+                'sec-ch-ua' => '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+                'sec-ch-ua-mobile' => '?0',
+                'sec-ch-ua-platform' => '"Windows"',
+                'DNT' => '1',
+                'Referer' => 'https://www.google.com/',
+                'Cookie' => 'customerId=' . uniqid() . '; storeId=0; marketId=1;'
             ]);
         }
         
@@ -536,6 +636,30 @@ class ProductController extends Controller
                 Log::warning("Cloudflare protection detected for Etsy URL: $url");
                 throw new \Exception("This website is currently using enhanced protection. Please try again later.");
             }
+        } elseif ($platform === 'walmart') {
+            $botDetectionPhrases = array_merge($botDetectionPhrases, [
+                'Please verify you are a human',
+                'Security Check',
+                'Access Denied',
+                'Bot Protection',
+                'unusual activity',
+                'suspicious activity',
+                'automated access',
+                'security verification',
+                'verification required',
+                'verify you are human',
+                'verify you are not a robot',
+                'verify you are not automated',
+                'verify you are not a bot'
+            ]);
+            
+            // Check for Walmart-specific bot detection
+            if (str_contains($html, 'security check') || 
+                str_contains($html, 'verify you are human') || 
+                str_contains($html, 'bot protection')) {
+                Log::warning("Walmart bot protection detected for URL: $url");
+                throw new \Exception("Walmart is currently blocking automated access. Please try again later or use a different approach.");
+            }
         }
         
         foreach ($botDetectionPhrases as $phrase) {
@@ -593,74 +717,74 @@ class ProductController extends Controller
      * @return array
      */
     private function parseProductHtml($html, $platform, $url)
-{
-    $crawler = new Crawler($html);
-    
-    $productData = [
-        'name' => '',
-        'original_price' => 0,
-        'discounted_price' => null,
-        'image' => '',
-        'description' => '',
-        'store' => ucfirst($platform),
-        'original_url' => $url,
-        'shipping' => 0,
-        'customs' => 0,
-        'service_fee' => 0,
-        'vat' => 0,
-        'total_price' => 0,
-        'images' => [],
-        'features' => [],           // New
-        'specifications' => [],     // New
-        'brand' => null,           // New
-        'category' => null,        // New
-        'rating' => null,          // New
-        'review_count' => 0,       // New
-        'in_stock' => true,        // New
-        'sku' => null,             // New
-        'additional_info' => []    // New
-    ];
-    
-    switch ($platform) {
-        case 'amazon':
-            $productData = $this->parseAmazonProduct($crawler, $productData);
-            break;
-        case 'walmart':
-            $productData = $this->parseWalmartProduct($crawler, $productData);
-            break;
-        case 'ebay':
-            $productData = $this->parseEbayProduct($crawler, $productData);
-            break;
-        case 'aliexpress':
-            $productData = $this->parseAliexpressProduct($crawler, $productData);
-            break;
-        case 'alibaba':
-            $productData = $this->parseAlibabaProduct($crawler, $productData);
-            break;
-        case 'zara':
-            $productData = $this->parseZaraProduct($crawler, $productData);
-            break;
-        case 'etsy':
-            $productData = $this->parseEtsyProduct($crawler, $productData);
-            break;
-        default:
-            $productData = $this->parseGenericProduct($crawler, $productData);
-            break;
+    {
+        $crawler = new Crawler($html);
+        
+        $productData = [
+            'name' => '',
+            'original_price' => 0,
+            'discounted_price' => null,
+            'image' => '',
+            'description' => '',
+            'store' => ucfirst($platform),
+            'original_url' => $url,
+            'shipping' => 0,
+            'customs' => 0,
+            'service_fee' => 0,
+            'vat' => 0,
+            'total_price' => 0,
+            'images' => [],
+            'features' => [],           // New
+            'specifications' => [],     // New
+            'brand' => null,           // New
+            'category' => null,        // New
+            'rating' => null,          // New
+            'review_count' => 0,       // New
+            'in_stock' => true,        // New
+            'sku' => null,             // New
+            'additional_info' => []    // New
+        ];
+        
+        switch ($platform) {
+            case 'amazon':
+                $productData = $this->parseAmazonProduct($crawler, $productData);
+                break;
+            case 'walmart':
+                $productData = $this->parseWalmartProduct($crawler, $productData);
+                break;
+            case 'ebay':
+                $productData = $this->parseEbayProduct($crawler, $productData);
+                break;
+            case 'aliexpress':
+                $productData = $this->parseAliexpressProduct($crawler, $productData);
+                break;
+            case 'alibaba':
+                $productData = $this->parseAlibabaProduct($crawler, $productData);
+                break;
+            case 'zara':
+                $productData = $this->parseZaraProduct($crawler, $productData);
+                break;
+            case 'etsy':
+                $productData = $this->parseEtsyProduct($crawler, $productData);
+                break;
+            default:
+                $productData = $this->parseGenericProduct($crawler, $productData);
+                break;
+        }
+        
+        // Calculate additional fees
+        $productData['shipping'] = 25.0;
+        $productData['customs'] = 18.5;
+        $productData['service_fee'] = 12.99;
+        $productData['vat'] = $productData['original_price'] * 0.2; // 20% VAT
+        $productData['total_price'] = $productData['original_price'] + 
+                                     $productData['shipping'] + 
+                                     $productData['customs'] + 
+                                     $productData['service_fee'] + 
+                                     $productData['vat'];
+        
+        return $productData;
     }
-    
-    // Calculate additional fees
-    $productData['shipping'] = 25.0;
-    $productData['customs'] = 18.5;
-    $productData['service_fee'] = 12.99;
-    $productData['vat'] = $productData['original_price'] * 0.2; // 20% VAT
-    $productData['total_price'] = $productData['original_price'] + 
-                                 $productData['shipping'] + 
-                                 $productData['customs'] + 
-                                 $productData['service_fee'] + 
-                                 $productData['vat'];
-    
-    return $productData;
-}
     
     /**
      * Parse Amazon product
@@ -670,172 +794,169 @@ class ProductController extends Controller
      * @return array
      */
     private function parseAmazonProduct($crawler, $productData)
-{
-    try {
-        // Extract product name
-        $productData['name'] = $this->getFirstAvailableText($crawler, [
-            '#productTitle',
-            'h1#title',
-            'span#productTitle'
-        ]) ?? 'Unknown Product';
-        
-        // Extract price
-        $priceText = $this->getFirstAvailableText($crawler, [
-            'span.a-price .a-offscreen',
-            '#priceblock_ourprice',
-            '#priceblock_saleprice',
-            '.a-price .a-price-whole',
-            'span[data-a-color="price"] .a-offscreen'
-        ]) ?? '';
-        $productData['original_price'] = $this->extractPrice($priceText);
-        
-        // Extract discounted price
-        $discountedPriceText = $this->getFirstAvailableText($crawler, [
-            '#priceblock_dealprice',
-            '#priceblock_saleprice',
-            '.savingsPercentage + .a-price .a-offscreen'
-        ]) ?? '';
-        if ($discountedPriceText) {
-            $productData['discounted_price'] = $this->extractPrice($discountedPriceText);
-        }
-        
-        // Extract image
-        $productData['image'] = $this->getFirstAvailableAttribute($crawler, [
-            '#landingImage',
-            '#imgBlkFront',
-            '#main-image',
-            'img[data-a-image-name="landingImage"]'
-        ], 'src') ?? '';
-        if ($productData['image']) {
-            $productData['image'] = preg_replace('/\._[^\.]+_\./', '.', $productData['image']);
-        }
-        
-        // Extract description
-        $productData['description'] = $this->getFirstAvailableText($crawler, [
-            '#productDescription',
-            '#feature-bullets',
-            '#productDetails_feature_div'
-        ]) ?? '';
-        
-        // Extract additional images
-        $productData['images'] = [];
-        $imagePaths = [
-            '#altImages .a-button-thumbnail img',
-            '#imageBlock_feature_div .item img',
-            '.imageThumbnail img'
-        ];
-        foreach ($imagePaths as $path) {
-            try {
-                $crawler->filter($path)->each(function (Crawler $node) use (&$productData) {
-                    $imgSrc = $node->attr('src');
-                    if ($imgSrc) {
-                        $highResSrc = preg_replace('/\._[^\.]+_\./', '.', $imgSrc);
-                        if (!in_array($highResSrc, $productData['images'])) {
-                            $productData['images'][] = $highResSrc;
+    {
+        try {
+            // Extract product name
+            $productData['name'] = $this->getFirstAvailableText($crawler, [
+                '#productTitle',
+                'h1#title',
+                'span#productTitle'
+            ]) ?? 'Unknown Product';
+            
+            // Extract price
+            $priceText = $this->getFirstAvailableText($crawler, [
+                'span.a-price .a-offscreen',
+                '#priceblock_ourprice',
+                '#priceblock_saleprice',
+                '.a-price .a-price-whole',
+                'span[data-a-color="price"] .a-offscreen'
+            ]) ?? '';
+            $productData['original_price'] = $this->extractPrice($priceText);
+            
+            // Extract discounted price
+            $discountedPriceText = $this->getFirstAvailableText($crawler, [
+                '#priceblock_dealprice',
+                '#priceblock_saleprice',
+                '.savingsPercentage + .a-price .a-offscreen'
+            ]) ?? '';
+            if ($discountedPriceText) {
+                $productData['discounted_price'] = $this->extractPrice($discountedPriceText);
+            }
+            
+            // Extract image
+            $productData['image'] = $this->getFirstAvailableAttribute($crawler, [
+                '#landingImage',
+                '#imgBlkFront',
+                '#main-image',
+                'img[data-a-image-name="landingImage"]'
+            ], 'src') ?? '';
+            
+            // Extract description
+            $productData['description'] = $this->getFirstAvailableText($crawler, [
+                '#productDescription',
+                '#feature-bullets',
+                '#productDetails_feature_div'
+            ]) ?? '';
+            
+            // Extract additional images
+            $productData['images'] = [];
+            $imagePaths = [
+                '#altImages .a-button-thumbnail img',
+                '#imageBlock_feature_div .item img',
+                '.imageThumbnail img'
+            ];
+            foreach ($imagePaths as $path) {
+                try {
+                    $crawler->filter($path)->each(function (Crawler $node) use (&$productData) {
+                        $imgSrc = $node->attr('src');
+                        if ($imgSrc) {
+                            $highResSrc = preg_replace('/\._[^\.]+_\./', '.', $imgSrc);
+                            if (!in_array($highResSrc, $productData['images'])) {
+                                $productData['images'][] = $highResSrc;
+                            }
                         }
+                    });
+                    if (!empty($productData['images'])) {
+                        break;
+                    }
+                } catch (\Exception $e) {
+                    continue;
+                }
+            }
+            
+            // Extract features (from feature bullets)
+            $productData['features'] = [];
+            try {
+                $crawler->filter('#feature-bullets ul li')->each(function (Crawler $node) use (&$productData) {
+                    $feature = trim($node->text());
+                    if ($feature) {
+                        $productData['features'][] = $feature;
                     }
                 });
-                if (!empty($productData['images'])) {
-                    break;
-                }
             } catch (\Exception $e) {
-                continue;
+                Log::warning('Failed to extract Amazon features: ' . $e->getMessage());
             }
-        }
-        
-        // Extract features (from feature bullets)
-        $productData['features'] = [];
-        try {
-            $crawler->filter('#feature-bullets ul li')->each(function (Crawler $node) use (&$productData) {
-                $feature = trim($node->text());
-                if ($feature) {
-                    $productData['features'][] = $feature;
-                }
-            });
+            
+            // Extract specifications (from product details or technical details)
+            $productData['specifications'] = [];
+            try {
+                $crawler->filter('#productDetails_techSpec_section_1 tr, #productDetails_detailBullets_sections1 tr')->each(function (Crawler $node) use (&$productData) {
+                    $key = trim($node->filter('th')->text());
+                    $value = trim($node->filter('td')->text());
+                    if ($key && $value) {
+                        $productData['specifications'][$key] = $value;
+                    }
+                });
+            } catch (\Exception $e) {
+                Log::warning('Failed to extract Amazon specifications: ' . $e->getMessage());
+            }
+            
+            // Extract brand
+            $productData['brand'] = $this->getFirstAvailableText($crawler, [
+                '#bylineInfo',
+                '#brand',
+                'a#bylineInfo'
+            ]) ?? null;
+            
+            // Extract category (from breadcrumb)
+            $productData['category'] = null;
+            try {
+                $categories = $crawler->filter('#wayfinding-breadcrumbs_feature_div ul li a')->each(function (Crawler $node) {
+                    return trim($node->text());
+                });
+                $productData['category'] = !empty($categories) ? implode(' > ', $categories) : null;
+            } catch (\Exception $e) {
+                Log::warning('Failed to extract Amazon category: ' . $e->getMessage());
+            }
+            
+            // Extract rating
+            $ratingText = $this->getFirstAvailableText($crawler, [
+                '#acrPopover .a-declarative .a-size-base',
+                '.reviewCountTextLinkedHistogram .a-size-base'
+            ]) ?? '';
+            $productData['rating'] = $ratingText ? floatval(preg_replace('/[^0-9.]/', '', $ratingText)) : null;
+            
+            // Extract review count
+            $reviewCountText = $this->getFirstAvailableText($crawler, [
+                '#acrCustomerReviewText',
+                '.averageStarRatingNumerical .a-size-base'
+            ]) ?? '';
+            $productData['review_count'] = $reviewCountText ? (int) preg_replace('/[^0-9]/', '', $reviewCountText) : 0;
+            
+            // Extract stock status
+            $stockText = $this->getFirstAvailableText($crawler, [
+                '#availability .a-size-medium',
+                '#availabilityInsideBuyBox_feature_div .a-size-medium'
+            ]) ?? '';
+            $productData['in_stock'] = str_contains(strtolower($stockText), 'in stock') || empty($stockText);
+            
+            // Extract SKU (ASIN for Amazon)
+            $productData['sku'] = $this->getFirstAvailableText($crawler, [
+                '#productDetails_detailBullets_sections1 tr:contains("ASIN") td',
+                '#ASIN'
+            ]) ?? null;
+            
+            // Extract additional info (e.g., color, size, etc.)
+            $productData['additional_info'] = [];
+            try {
+                $crawler->filter('#variation_color_name .selection, #variation_size_name .selection')->each(function (Crawler $node) use (&$productData) {
+                    $key = str_contains($node->ancestors()->attr('id'), 'color') ? 'Color' : 'Size';
+                    $productData['additional_info'][$key] = trim($node->text());
+                });
+            } catch (\Exception $e) {
+                Log::warning('Failed to extract Amazon additional info: ' . $e->getMessage());
+            }
+            
+            // Set store
+            $productData['store'] = 'Amazon';
+            
         } catch (\Exception $e) {
-            Log::warning('Failed to extract Amazon features: ' . $e->getMessage());
+            Log::error('Error parsing Amazon product: ' . $e->getMessage());
+            throw new \Exception('Failed to parse Amazon product details');
         }
         
-        // Extract specifications (from product details or technical details)
-        $productData['specifications'] = [];
-        try {
-            $crawler->filter('#productDetails_techSpec_section_1 tr, #productDetails_detailBullets_sections1 tr')->each(function (Crawler $node) use (&$productData) {
-                $key = trim($node->filter('th')->text());
-                $value = trim($node->filter('td')->text());
-                if ($key && $value) {
-                    $productData['specifications'][$key] = $value;
-                }
-            });
-        } catch (\Exception $e) {
-            Log::warning('Failed to extract Amazon specifications: ' . $e->getMessage());
-        }
-        
-        // Extract brand
-        $productData['brand'] = $this->getFirstAvailableText($crawler, [
-            '#bylineInfo',
-            '#brand',
-            'a#bylineInfo'
-        ]) ?? null;
-        
-        // Extract category (from breadcrumb)
-        $productData['category'] = null;
-        try {
-            $categories = $crawler->filter('#wayfinding-breadcrumbs_feature_div ul li a')->each(function (Crawler $node) {
-                return trim($node->text());
-            });
-            $productData['category'] = !empty($categories) ? implode(' > ', $categories) : null;
-        } catch (\Exception $e) {
-            Log::warning('Failed to extract Amazon category: ' . $e->getMessage());
-        }
-        
-        // Extract rating
-        $ratingText = $this->getFirstAvailableText($crawler, [
-            '#acrPopover .a-declarative .a-size-base',
-            '.reviewCountTextLinkedHistogram .a-size-base'
-        ]) ?? '';
-        $productData['rating'] = $ratingText ? floatval(preg_replace('/[^0-9.]/', '', $ratingText)) : null;
-        
-        // Extract review count
-        $reviewCountText = $this->getFirstAvailableText($crawler, [
-            '#acrCustomerReviewText',
-            '.averageStarRatingNumerical .a-size-base'
-        ]) ?? '';
-        $productData['review_count'] = $reviewCountText ? (int) preg_replace('/[^0-9]/', '', $reviewCountText) : 0;
-        
-        // Extract stock status
-        $stockText = $this->getFirstAvailableText($crawler, [
-            '#availability .a-size-medium',
-            '#availabilityInsideBuyBox_feature_div .a-size-medium'
-        ]) ?? '';
-        $productData['in_stock'] = str_contains(strtolower($stockText), 'in stock') || empty($stockText);
-        
-        // Extract SKU (ASIN for Amazon)
-        $productData['sku'] = $this->getFirstAvailableText($crawler, [
-            '#productDetails_detailBullets_sections1 tr:contains("ASIN") td',
-            '#ASIN'
-        ]) ?? null;
-        
-        // Extract additional info (e.g., color, size, etc.)
-        $productData['additional_info'] = [];
-        try {
-            $crawler->filter('#variation_color_name .selection, #variation_size_name .selection')->each(function (Crawler $node) use (&$productData) {
-                $key = str_contains($node->ancestors()->attr('id'), 'color') ? 'Color' : 'Size';
-                $productData['additional_info'][$key] = trim($node->text());
-            });
-        } catch (\Exception $e) {
-            Log::warning('Failed to extract Amazon additional info: ' . $e->getMessage());
-        }
-        
-        // Set store
-        $productData['store'] = 'Amazon';
-        
-    } catch (\Exception $e) {
-        Log::error('Error parsing Amazon product: ' . $e->getMessage());
-        throw new \Exception('Failed to parse Amazon product details');
+        return $productData;
     }
-    
-    return $productData;
-}
     
     /**
      * Helper function to get the first available text from multiple selectors
