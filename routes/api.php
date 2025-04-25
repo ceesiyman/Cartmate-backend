@@ -12,6 +12,8 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\CustomerController;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\VerifyEmail;
+use App\Http\Controllers\RetailerController;
+use App\Http\Controllers\BannerController;
 
 /*
 |--------------------------------------------------------------------------
@@ -125,4 +127,15 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // User
     Route::get('/user', [UserController::class, 'getUser']);
     Route::post('/user/update', [UserController::class, 'updateUser']);
+
+    // Retailer
+    Route::get('/retailers', [RetailerController::class, 'index']);
+    Route::post('/retailers', [RetailerController::class, 'store']);
+    Route::put('/retailers/{id}', [RetailerController::class, 'update']);
+    Route::delete('/retailers/{id}', [RetailerController::class, 'destroy']);
+
+    Route::get('/banners', [BannerController::class, 'index']);
+    Route::post('/banners', [BannerController::class, 'store']);
+    Route::put('/banners/{id}', [BannerController::class, 'update']);
+    Route::delete('/banners/{id}', [BannerController::class, 'destroy']);
 });
