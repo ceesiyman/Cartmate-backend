@@ -10,6 +10,7 @@ use App\Http\Controllers\StoreController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\AnalyticsController;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\VerifyEmail;
 
@@ -125,4 +126,16 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // User
     Route::get('/user', [UserController::class, 'getUser']);
     Route::post('/user/update', [UserController::class, 'updateUser']);
+});
+
+
+Route::middleware(['auth:sanctum'])->prefix('admin/analytics')->group(function () {
+    Route::get('/key-metrics', [AnalyticsController::class, 'keyMetrics']);
+    Route::get('/top-products', [AnalyticsController::class, 'topProducts']);
+    Route::get('/top-stores', [AnalyticsController::class, 'topStores']);
+    Route::get('/sales-by-category', [AnalyticsController::class, 'salesByCategory']);
+    Route::get('/orders-by-status', [AnalyticsController::class, 'ordersByStatus']);
+    Route::get('/geographic-distribution', [AnalyticsController::class, 'geographicDistribution']);
+    Route::get('/traffic-sources', [AnalyticsController::class, 'trafficSources']);
+    Route::get('/revenue-trends', [AnalyticsController::class, 'revenueTrends']);
 });

@@ -6,6 +6,7 @@ use App\Models\Cart;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Traits\TrafficConversionTracker;
 
 /**
  * @OA\Tag(
@@ -122,6 +123,9 @@ class CartController extends Controller
                 ->where('product_id', $product->id)
                 ->first();
 
+                    // Track the conversion
+        $this->trackOrderConversion();
+
             return response()->json([
                 'success' => true,
                 'message' => 'Product added to cart successfully',
@@ -201,6 +205,9 @@ class CartController extends Controller
             $cartItems = Cart::with('product')
                 ->where('user_id', $request->user_id)
                 ->get();
+
+                    // Track the conversion
+        $this->trackOrderConversion();
 
             return response()->json([
                 'success' => true,
@@ -323,7 +330,8 @@ class CartController extends Controller
                 ->where('user_id', $request->user_id)
                 ->where('product_id', $request->product_id)
                 ->first();
-
+    // Track the conversion
+        $this->trackOrderConversion();
             return response()->json([
                 'success' => true,
                 'message' => 'Cart item updated successfully',
@@ -415,7 +423,9 @@ class CartController extends Controller
             }
 
             $cartItem->delete();
-
+    // Track the conversion
+    $this->trackOrderConversion();
+    
             return response()->json([
                 'success' => true,
                 'message' => 'Cart item removed successfully'

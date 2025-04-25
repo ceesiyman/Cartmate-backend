@@ -362,7 +362,7 @@ class ProductController extends Controller
                 'message' => 'Product not found'
             ], 404);
         }
-        
+
         return response()->json([
             'success' => true,
             'data' => $product
