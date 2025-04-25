@@ -280,6 +280,13 @@ class ProductController extends Controller
                 $productData
             );
             
+            $trafficSource = new \App\Models\TrafficSource();
+            $trafficSource->source = 'fetch_products';
+            $trafficSource->visits = 1;
+            $trafficSource->orders = 0;
+            $trafficSource->recorded_at = now();
+            $trafficSource->save();
+
             return response()->json([
                 'success' => true,
                 'message' => $product->wasRecentlyCreated ? 'Product fetched and stored successfully' : 'Product already exists',
@@ -316,6 +323,13 @@ class ProductController extends Controller
     {
         $products = Product::all();
         
+        $trafficSource = new \App\Models\TrafficSource();
+        $trafficSource->source = 'show_products';
+        $trafficSource->visits = 1;
+        $trafficSource->orders = 0;
+        $trafficSource->recorded_at = now();
+        $trafficSource->save();
+
         return response()->json([
             'success' => true,
             'data' => $products
@@ -362,6 +376,13 @@ class ProductController extends Controller
                 'message' => 'Product not found'
             ], 404);
         }
+
+        $trafficSource = new \App\Models\TrafficSource();
+        $trafficSource->source = 'show_product';
+        $trafficSource->visits = 1;
+        $trafficSource->orders = 0;
+        $trafficSource->recorded_at = now();
+        $trafficSource->save();
 
         return response()->json([
             'success' => true,
@@ -468,6 +489,13 @@ class ProductController extends Controller
         ->orderBy('cart_count', 'desc')
         ->limit($limit)
         ->get();
+
+        $trafficSource = new \App\Models\TrafficSource();
+        $trafficSource->source = 'trending_products';
+        $trafficSource->visits = 1;
+        $trafficSource->orders = 0;
+        $trafficSource->recorded_at = now();
+        $trafficSource->save();
 
         return response()->json([
             'success' => true,

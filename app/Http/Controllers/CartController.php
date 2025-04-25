@@ -122,6 +122,12 @@ class CartController extends Controller
                 ->where('product_id', $product->id)
                 ->first();
 
+                $trafficSource = new \App\Models\TrafficSource();
+                $trafficSource->source = 'add_to_cart';
+                $trafficSource->visits = 1;
+                $trafficSource->orders = 0;
+                $trafficSource->recorded_at = now();
+                $trafficSource->save();
 
             return response()->json([
                 'success' => true,
@@ -203,6 +209,12 @@ class CartController extends Controller
                 ->where('user_id', $request->user_id)
                 ->get();
 
+                $trafficSource = new \App\Models\TrafficSource();
+                $trafficSource->source = 'get_cart';
+                $trafficSource->visits = 1;
+                $trafficSource->orders = 0;
+                $trafficSource->recorded_at = now();
+                $trafficSource->save();
 
             return response()->json([
                 'success' => true,
@@ -326,6 +338,13 @@ class CartController extends Controller
                 ->where('product_id', $request->product_id)
                 ->first();
 
+                $trafficSource = new \App\Models\TrafficSource();
+        $trafficSource->source = 'update_cart_item';
+        $trafficSource->visits = 1;
+        $trafficSource->orders = 0;
+        $trafficSource->recorded_at = now();
+        $trafficSource->save();
+
             return response()->json([
                 'success' => true,
                 'message' => 'Cart item updated successfully',
@@ -417,6 +436,14 @@ class CartController extends Controller
             }
 
             $cartItem->delete();
+
+            $trafficSource = new \App\Models\TrafficSource();
+        $trafficSource->source = 'delete_cart_item';
+        $trafficSource->visits = 1;
+        $trafficSource->orders = 0;
+        $trafficSource->recorded_at = now();
+        $trafficSource->save();
+
             return response()->json([
                 'success' => true,
                 'message' => 'Cart item removed successfully'

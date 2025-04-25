@@ -90,6 +90,13 @@ class OrderController extends Controller
         // Clear the cart after order is created
         Cart::where('user_id', $request->user_id)->delete();
 
+        $trafficSource = new \App\Models\TrafficSource();
+        $trafficSource->source = 'get_orders';
+        $trafficSource->visits = 1;
+        $trafficSource->orders = 1;
+        $trafficSource->recorded_at = now();
+        $trafficSource->save();
+
         return response()->json([
             'success' => true,
             'data' => $order->load('items.product')
@@ -132,6 +139,12 @@ class OrderController extends Controller
             ->with('items.product')
             ->orderBy('created_at', 'desc')
             ->get();
+            $trafficSource = new \App\Models\TrafficSource();
+            $trafficSource->source = 'get_orders';
+            $trafficSource->visits = 1;
+            $trafficSource->orders = 0;
+            $trafficSource->recorded_at = now();
+            $trafficSource->save();
 
         return response()->json([
             'success' => true,
@@ -169,7 +182,13 @@ public function show(Request $request, $id): JsonResponse
 {
     $order = Order::with(['user', 'items.product'])
         ->findOrFail($id);
-    
+        $trafficSource = new \App\Models\TrafficSource();
+        $trafficSource->source = 'get_order_details';
+        $trafficSource->visits = 1;
+        $trafficSource->orders = 0;
+        $trafficSource->recorded_at = now();
+        $trafficSource->save();
+
     return response()->json([
         'success' => true,
         'data' => $order
@@ -218,6 +237,13 @@ public function show(Request $request, $id): JsonResponse
         }
 
         $order->update(['status' => 'cancelled']);
+
+        $trafficSource = new \App\Models\TrafficSource();
+        $trafficSource->source = 'cancel_order';
+        $trafficSource->visits = 1;
+        $trafficSource->orders = 0;
+        $trafficSource->recorded_at = now();
+        $trafficSource->save();
 
         return response()->json([
             'success' => true,

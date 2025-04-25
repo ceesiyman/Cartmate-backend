@@ -378,51 +378,54 @@ class AnalyticsController extends Controller
     }
 
     public function trafficSources(Request $request)
-    {
-        $timeRange = $request->query('time_range', '30d');
-        [$startDate, $endDate] = $this->getDateRange($timeRange);
-        [$prevStartDate, $prevEndDate] = $this->getPreviousPeriod($startDate, $endDate);
-
-        $sources = TrafficSource::query()
-            ->whereBetween('recorded_at', [$startDate, $endDate])
-            ->groupBy('source')
-            ->selectRaw('
-                source,
-                SUM(visits) as visits,
-                SUM(orders) as orders
-            ')
-            ->orderBy('visits', 'desc')
-            ->get();
-
-        $data = $sources->map(function ($source) use ($startDate, $endDate, $prevStartDate, $prevEndDate) {
-            $prevSource = TrafficSource::query()
-                ->whereBetween('recorded_at', [$prevStartDate, $prevEndDate])
-                ->where('source', $source->source)
-                ->selectRaw('
-                    SUM(visits) as visits,
-                    SUM(orders) as orders
-                ')
-                ->first();
-
-            $prevVisits = $prevSource ? $prevSource->visits : 0;
-            $change = $prevVisits ? (($source->visits - $prevVisits) / $prevVisits * 100) : 0;
-            $conversionRate = $source->visits ? ($source->orders / $source->visits * 100) : 0;
-
-            return [
-                'source' => $source->source,
-                'visits' => (int) $source->visits,
-                'orders' => (int) $source->orders,
-                'conversion_rate' => round($conversionRate, 1),
-                'percentage_change' => round($change, 1),
-                'trend' => $change >= 0 ? 'increase' : 'decrease',
-            ];
-        });
-
-        return response()->json([
-            'success' => true,
-            'data' => $data->toArray(),
-        ]);
-    }
+{
+    $timeRange = $request->query('time_range', '30d');
+    [$startDate, $endDate] = $this->getDateRange($timeRange);
+    [$prevStartDate, $prevEndDate] = $this->getPreviousPeriod($startDate, $endDate);
+    
+    // Optimize the query using a single database call for current period
+    $sources = TrafficSource::query()
+        ->whereBetween('recorded_at', [$startDate, $endDate])
+        ->groupBy('source')
+        ->selectRaw('
+            source,
+            SUM(visits) as visits,
+            SUM(orders) as orders,
+            CASE WHEN SUM(visits) > 0 THEN (SUM(orders) / SUM(visits) * 100) ELSE 0 END as conversion_rate
+        ')
+        ->orderBy('visits', 'desc')
+        ->get();
+    
+    // Get previous period data in a single query
+    $previousSources = TrafficSource::query()
+        ->whereBetween('recorded_at', [$prevStartDate, $prevEndDate])
+        ->groupBy('source')
+        ->selectRaw('
+            source,
+            SUM(visits) as visits
+        ')
+        ->pluck('visits', 'source')
+        ->toArray();
+    
+    $data = $sources->map(function ($source) use ($previousSources) {
+        $prevVisits = $previousSources[$source->source] ?? 0;
+        $change = $prevVisits > 0 ? (($source->visits - $prevVisits) / $prevVisits * 100) : 0;
+        
+        return [
+            'source' => $source->source,
+            'visits' => (int) $source->visits,
+            'orders' => (int) $source->orders,
+            'conversion_rate' => round($source->conversion_rate, 1),
+            'percentage_change' => round($change, 1),
+            'trend' => $change >= 0 ? 'increase' : 'decrease',
+        ];
+    });
+    
+    return response()->json([
+        'success' => true,
+        'data' => $data->toArray(),
+    ]);
+}
 
     public function revenueTrends(Request $request)
 {
