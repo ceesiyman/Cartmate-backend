@@ -126,7 +126,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::delete('/orders/{id}/documents/{document_id}', [OrderController::class, 'deleteDocument']);
 
     // User
-    Route::get('/user', [UserController::class, 'getUser']);
+    Route::get('/user/get', [UserController::class, 'getUser']);
     Route::post('/user/update', [UserController::class, 'updateUser']);
 
     // Retailer

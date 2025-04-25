@@ -17,106 +17,141 @@ use Illuminate\Support\Facades\Log;
 class ProductController extends Controller
 {
     /**
-     * @OA\Post(
-     *     path="/api/products/fetch",
-     *     summary="Fetch product details from a URL",
-     *     tags={"Products"},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"url"},
-     *             @OA\Property(
-     *                 property="url",
-     *                 type="string",
-     *                 description="Product URL. Supports both full and shortened URLs for all platforms.",
-     *                 example="https://www.amazon.com/dp/B07ZPKN6YR or https://a.co/d/ijvysyu"
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Product details fetched successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Product fetched and stored successfully"),
-     *             @OA\Property(property="data", type="object")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=400,
-     *         description="Invalid URL or missing parameters",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="URL is required")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Server error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Failed to fetch product details")
-     *         )
-     *     )
-     * )
-     */
-    public function fetchProduct(Request $request)
-    {
-        $request->validate([
-            'url' => 'required|url',
-        ]);
+ * @OA\Post(
+ *     path="/api/products/fetch",
+ *     summary="Fetch product details from a URL",
+ *     tags={"Products"},
+ *     @OA\RequestBody(
+ *         required=true,
+ *         @OA\JsonContent(
+ *             required={"url"},
+ *             @OA\Property(
+ *                 property="url",
+ *                 type="string",
+ *                 description="Product URL. Supports both full and shortened URLs for all platforms.",
+ *                 example="https://www.amazon.com/dp/B07ZPKN6YR or https://a.co/d/ijvysyu"
+ *             )
+ *         )
+ *     ),
+ *     @OA\Response(
+ *         response=200,
+ *         description="Product details fetched successfully",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=true),
+ *             @OA\Property(property="message", type="string", example="Product fetched and stored successfully"),
+ *             @OA\Property(property="data", type="object")
+ *         )
+ *     ),
+ *     @OA\Response(
+ *         response=400,
+ *         description="Invalid URL or missing parameters",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=false),
+ *             @OA\Property(property="message", type="string", example="URL is required")
+ *         )
+ *     ),
+ *     @OA\Response(
+ *         response=500,
+ *         description="Server error",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=false),
+ *             @OA\Property(property="message", type="string", example="Failed to fetch product details")
+ *         )
+ *     )
+ * )
+ */
+public function fetchProduct(Request $request)
+{
+    $request->validate([
+        'url' => 'required|url',
+    ]);
 
-        try {
-            $url = $request->url;
+    try {
+        $url = $request->url;
+        
+        // Check if product already exists with this URL
+        $existingProduct = Product::where('original_url', $url)->first();
+        if ($existingProduct) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Product already exists',
+                'data' => $existingProduct
+            ]);
+        }
+        
+        // Determine the platform from the URL
+        $platform = $this->determinePlatform($url);
+        
+        // Handle shortened URLs for all platforms
+        $shortenedDomains = [
+            'a.co' => 'amazon.com',
+            'amzn.to' => 'amazon.com',
+            'wmt.us' => 'walmart.com',
+            'ebay.us' => 'ebay.com',
+            'aliex.us' => 'aliexpress.com',
+            'alib.us' => 'alibaba.com',
+            'zara.us' => 'zara.com',
+            'etsy.me' => 'etsy.com'
+        ];
+        
+        // Check if it's a shortened URL
+        $parsedUrl = parse_url($url);
+        $host = $parsedUrl['host'] ?? '';
+        
+        if (array_key_exists($host, $shortenedDomains)) {
+            $response = Http::withHeaders([
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            ])->withOptions([
+                'allow_redirects' => true,
+                'verify' => false
+            ])->get($url);
             
-            // Check if product already exists with this URL
-            $existingProduct = Product::where('original_url', $url)->first();
-            if ($existingProduct) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Product already exists',
-                    'data' => $existingProduct
-                ]);
+            if ($response->successful()) {
+                $url = $response->effectiveUri()->__toString();
+                // Re-determine platform after URL expansion
+                $platform = $this->determinePlatform($url);
             }
-            
-            // Determine the platform from the URL
-            $platform = $this->determinePlatform($url);
-            
-            // Handle shortened URLs for all platforms
-            $shortenedDomains = [
-                'a.co' => 'amazon.com',
-                'amzn.to' => 'amazon.com',
-                'wmt.us' => 'walmart.com',
-                'ebay.us' => 'ebay.com',
-                'aliex.us' => 'aliexpress.com',
-                'alib.us' => 'alibaba.com',
-                'zara.us' => 'zara.com',
-                'etsy.me' => 'etsy.com'
-            ];
-            
-            // Check if it's a shortened URL
-            $parsedUrl = parse_url($url);
-            $host = $parsedUrl['host'] ?? '';
-            
-            if (array_key_exists($host, $shortenedDomains)) {
-                $response = Http::withHeaders([
-                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                ])->withOptions([
-                    'allow_redirects' => true,
-                    'verify' => false
-                ])->get($url);
-                
-                if ($response->successful()) {
-                    $url = $response->effectiveUri()->__toString();
-                    // Re-determine platform after URL expansion
-                    $platform = $this->determinePlatform($url);
-                }
-            }
-            
-            // Set common headers
-            $headers = [
-                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        }
+        
+        // Set common headers
+        $headers = [
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language' => 'en-US,en;q=0.9',
+            'Accept-Encoding' => 'gzip, deflate, br',
+            'Connection' => 'keep-alive',
+            'Upgrade-Insecure-Requests' => '1',
+            'Sec-Fetch-Dest' => 'document',
+            'Sec-Fetch-Mode' => 'navigate',
+            'Sec-Fetch-Site' => 'none',
+            'Sec-Fetch-User' => '?1',
+            'Cache-Control' => 'max-age=0',
+            'sec-ch-ua' => '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            'sec-ch-ua-mobile' => '?0',
+            'sec-ch-ua-platform' => '"Windows"'
+        ];
+        
+        // Add platform-specific headers
+        if ($platform === 'aliexpress') {
+            $headers['Cookie'] = 'aep_usuc_f=site=usa&c_tp=USD®ion=US&b_locale=en_US&ae_u_c=1';
+            $headers['Accept-Language'] = 'en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7';
+        } elseif ($platform === 'etsy') {
+            $headers = array_merge($headers, [
+                'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                'Accept-Language' => 'en-US,en;q=0.9',
+                'Cache-Control' => 'no-cache',
+                'Pragma' => 'no-cache',
+                'Sec-CH-UA-Full-Version-List' => '"Not_A Brand";v="8.0.0.0", "Chromium";v="120.0.0.0", "Google Chrome";v="120.0.0.0"',
+                'Sec-CH-UA-Bitness' => '"64"',
+                'Sec-CH-UA-Model' => '""',
+                'Sec-CH-UA-Platform-Version' => '"15.0.0"',
+                'DNT' => '1',
+                'Referer' => 'https://www.google.com/',
+                'Cookie' => 'uaid=' . uniqid() . '; user_prefs=CgkIChIGcHJlZnMaAA; fve=' . time()
+            ]);
+        } elseif ($platform === 'walmart') {
+            $headers = array_merge($headers, [
+                'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
                 'Accept-Language' => 'en-US,en;q=0.9',
                 'Accept-Encoding' => 'gzip, deflate, br',
                 'Connection' => 'keep-alive',
@@ -128,181 +163,143 @@ class ProductController extends Controller
                 'Cache-Control' => 'max-age=0',
                 'sec-ch-ua' => '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
                 'sec-ch-ua-mobile' => '?0',
-                'sec-ch-ua-platform' => '"Windows"'
-            ];
-            
-            // Add platform-specific headers
-            if ($platform === 'aliexpress') {
-                $headers['Cookie'] = 'aep_usuc_f=site=usa&c_tp=USD&region=US&b_locale=en_US&ae_u_c=1';
-                $headers['Accept-Language'] = 'en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7';
-            } elseif ($platform === 'etsy') {
-                $headers = array_merge($headers, [
-                    'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-                    'Accept-Language' => 'en-US,en;q=0.9',
-                    'Cache-Control' => 'no-cache',
-                    'Pragma' => 'no-cache',
-                    'Sec-CH-UA-Full-Version-List' => '"Not_A Brand";v="8.0.0.0", "Chromium";v="120.0.0.0", "Google Chrome";v="120.0.0.0"',
-                    'Sec-CH-UA-Bitness' => '"64"',
-                    'Sec-CH-UA-Model' => '""',
-                    'Sec-CH-UA-Platform-Version' => '"15.0.0"',
-                    'DNT' => '1',
-                    'Referer' => 'https://www.google.com/',
-                    'Cookie' => 'uaid=' . uniqid() . '; user_prefs=CgkIChIGcHJlZnMaAA; fve=' . time()
-                ]);
-            } elseif ($platform === 'walmart') {
-                $headers = array_merge($headers, [
-                    'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-                    'Accept-Language' => 'en-US,en;q=0.9',
-                    'Accept-Encoding' => 'gzip, deflate, br',
-                    'Connection' => 'keep-alive',
-                    'Upgrade-Insecure-Requests' => '1',
-                    'Sec-Fetch-Dest' => 'document',
-                    'Sec-Fetch-Mode' => 'navigate',
-                    'Sec-Fetch-Site' => 'none',
-                    'Sec-Fetch-User' => '?1',
-                    'Cache-Control' => 'max-age=0',
-                    'sec-ch-ua' => '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-                    'sec-ch-ua-mobile' => '?0',
-                    'sec-ch-ua-platform' => '"Windows"',
-                    'DNT' => '1',
-                    'Referer' => 'https://www.google.com/',
-                    'Cookie' => 'customerId=' . uniqid() . '; storeId=0; marketId=1;'
-                ]);
-            }
-            
-            // Make the HTTP request with options
-            $response = Http::withHeaders($headers)
-                ->withOptions([
-                    'allow_redirects' => true,
-                    'verify' => false,
-                    'timeout' => 30,
-                    'connect_timeout' => 10
-                ]);
-                
-            // Add proxy support if configured
-            if (config('services.proxy.enabled')) {
-                $response = $response->withOptions([
-                    'proxy' => config('services.proxy.url')
-                ]);
-            }
-            
-            // Make the request
-            $response = $response->get($url);
-            
-            if (!$response->successful()) {
-                throw new \Exception('Failed to fetch the product page: ' . $response->status());
-            }
-            
-            $html = $response->body();
-            
-            // Enhanced bot detection checks
-            $botDetectionPhrases = [
-                'Robot Check',
-                'captcha',
-                'security check',
-                'To discuss automated access to Amazon data please contact',
-                'Please verify you are a human',
-                'Access Denied',
-                'detected unusual traffic',
-                'automated requests',
-                'suspicious activity'
-            ];
-            
-            // Add platform-specific bot detection phrases
-            if ($platform === 'etsy') {
-                $botDetectionPhrases = array_merge($botDetectionPhrases, [
-                    'Sorry, we\'re experiencing technical difficulties',
-                    'Your request was blocked',
-                    'Please confirm you are a human',
-                    'We\'ve detected unusual activity',
-                    'temporarily unavailable',
-                    'Too Many Requests',
-                    'rate limit exceeded',
-                    'unusual traffic pattern',
-                    'automated browsing behavior',
-                    'verify your identity',
-                    'our security system has been activated',
-                    'our site is currently unavailable in your region'
-                ]);
-                
-                // Check for Cloudflare protection
-                if (str_contains($html, 'cf-browser-verification') || 
-                    str_contains($html, 'cf-challenge') || 
-                    str_contains($html, '_cf_chl_opt')) {
-                    Log::warning("Cloudflare protection detected for Etsy URL: $url");
-                    throw new \Exception("This website is currently using enhanced protection. Please try again later.");
-                }
-            } elseif ($platform === 'walmart') {
-                $botDetectionPhrases = array_merge($botDetectionPhrases, [
-                    'Please verify you are a human',
-                    'Security Check',
-                    'Access Denied',
-                    'Bot Protection',
-                    'unusual activity',
-                    'suspicious activity',
-                    'automated access',
-                    'security verification',
-                    'verification required',
-                    'verify you are human',
-                    'verify you are not a robot',
-                    'verify you are not automated',
-                    'verify you are not a bot'
-                ]);
-                
-                // Check for Walmart-specific bot detection
-                if (str_contains($html, 'security check') || 
-                    str_contains($html, 'verify you are human') || 
-                    str_contains($html, 'bot protection')) {
-                    Log::warning("Walmart bot protection detected for URL: $url");
-                    throw new \Exception("Walmart is currently blocking automated access. Please try again later or use a different approach.");
-                }
-            }
-            
-            foreach ($botDetectionPhrases as $phrase) {
-                if (str_contains($html, $phrase)) {
-                    Log::warning("Bot detection triggered for $platform: $phrase");
-                    throw new \Exception("This website is currently blocking automated access. Please try again later or use a different approach.");
-                }
-            }
-            
-            // Parse the HTML based on the platform
-            $productData = $this->parseProductHtml($html, $platform, $url);
-            
-            // Add the original URL to the product data
-            $productData['original_url'] = $url;
-            
-            // Generate similar products
-            $productData['similar_products'] = $this->generateSimilarProducts($productData);
-            
-            // Use firstOrCreate to handle potential race conditions
-            $product = Product::firstOrCreate(
-                ['original_url' => $url],
-                $productData
-            );
-            
-            $trafficSource = new \App\Models\TrafficSource();
-            $trafficSource->source = 'fetch_products';
-            $trafficSource->visits = 1;
-            $trafficSource->orders = 0;
-            $trafficSource->recorded_at = now();
-            $trafficSource->save();
-
-            return response()->json([
-                'success' => true,
-                'message' => $product->wasRecentlyCreated ? 'Product fetched and stored successfully' : 'Product already exists',
-                'data' => $product
+                'sec-ch-ua-platform' => '"Windows"',
+                'DNT' => '1',
+                'Referer' => 'https://www.google.com/',
+                'Cookie' => 'customerId=' . uniqid() . '; storeId=0; marketId=1;'
+            ]);
+        }
+        
+        // Make the HTTP request with options
+        $response = Http::withHeaders($headers)
+            ->withOptions([
+                'allow_redirects' => true,
+                'verify' => false,
+                'timeout' => 30,
+                'connect_timeout' => 10
             ]);
             
-        } catch (\Exception $e) {
-            Log::error('Error fetching product: ' . $e->getMessage());
-            Log::error('Stack trace: ' . $e->getTraceAsString());
-            
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch product details: ' . $e->getMessage()
-            ], 500);
+        // Add proxy support if configured
+        if (config('services.proxy.enabled')) {
+            $response = $response->withOptions([
+                'proxy' => config('services.proxy.url')
+            ]);
         }
+        
+        // Make the request
+        $response = $response->get($url);
+        
+        if (!$response->successful()) {
+            throw new \Exception('Failed to fetch the product page: ' . $response->status());
+        }
+        
+        $html = $response->body();
+        
+        // Enhanced bot detection checks
+        $botDetectionPhrases = [
+            'Robot Check',
+            'captcha',
+            'security check',
+            'To discuss automated access to Amazon data please contact',
+            'Please verify you are a human',
+            'Access Denied',
+            'detected unusual traffic',
+            'automated requests',
+            'suspicious activity'
+        ];
+        
+        // Add platform-specific bot detection phrases
+        if ($platform === 'etsy') {
+            $botDetectionPhrases = array_merge($botDetectionPhrases, [
+                'Sorry, we\'re experiencing technical difficulties',
+                'Your request was blocked',
+                'Please confirm you are a human',
+                'We\'ve detected unusual activity',
+                'temporarily unavailable',
+                'Too Many Requests',
+                'rate limit exceeded',
+                'unusual traffic pattern',
+                'automated browsing behavior',
+                'verify your identity',
+                'our security system has been activated',
+                'our site is currently unavailable in your region'
+            ]);
+            
+            // Check for Cloudflare protection
+            if (str_contains($html, 'cf-browser-verification') || 
+                str_contains($html, 'cf-challenge') || 
+                str_contains($html, '_cf_chl_opt')) {
+                Log::warning("Cloudflare protection detected for Etsy URL: $url");
+                throw new \Exception("This website is currently using enhanced protection. Please try again later.");
+            }
+        } elseif ($platform === 'walmart') {
+            $botDetectionPhrases = array_merge($botDetectionPhrases, [
+                'Please verify you are a human',
+                'Security Check',
+                'Access Denied',
+                'Bot Protection',
+                'unusual activity',
+                'suspicious activity',
+                'automated access',
+                'security verification',
+                'verification required',
+                'verify you are human',
+                'verify you are not a robot',
+                'verify you are not automated',
+                'verify you are not a bot'
+            ]);
+            
+            // Check for Walmart-specific bot detection
+            if (str_contains($html, 'security check') || 
+                str_contains($html, 'verify you are human') || 
+                str_contains($html, 'bot protection')) {
+                Log::warning("Walmart bot protection detected for URL: $url");
+                throw new \Exception("Walmart is currently blocking automated access. Please try again later or use a different approach.");
+            }
+        }
+        
+        foreach ($botDetectionPhrases as $phrase) {
+            if (str_contains($html, $phrase)) {
+                Log::warning("Bot detection triggered for $platform: $phrase");
+                throw new \Exception("This website is currently blocking automated access. Please try again later or use a different approach.");
+            }
+        }
+        
+        // Parse the HTML based on the platform
+        $productData = $this->parseProductHtml($html, $platform, $url);
+        
+        // Add the original URL to the product data
+        $productData['original_url'] = $url;
+        
+        // Generate similar products
+        $productData['similar_products'] = $this->generateSimilarProducts($productData);
+        
+        // Save the product to the database only if it doesn't exist
+        $product = Product::create($productData); // Changed from firstOrCreate to create
+        
+        $trafficSource = new \App\Models\TrafficSource();
+        $trafficSource->source = 'fetch_products';
+        $trafficSource->visits = 1;
+        $trafficSource->orders = 0;
+        $trafficSource->recorded_at = now();
+        $trafficSource->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product fetched and stored successfully',
+            'data' => $product
+        ]);
+        
+    } catch (\Exception $e) {
+        Log::error('Error fetching product: ' . $e->getMessage());
+        Log::error('Stack trace: ' . $e->getTraceAsString());
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to fetch product details: ' . $e->getMessage()
+        ], 500);
     }
+}
 
     /**
      * @OA\Get(
