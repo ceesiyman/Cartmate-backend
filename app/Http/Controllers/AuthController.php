@@ -95,7 +95,7 @@ class AuthController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
         ]);
-
+    
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
@@ -103,29 +103,60 @@ class AuthController extends Controller
                 'errors' => $validator->errors()
             ], 422);
         }
-
+    
         // Create user with unverified email
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
         ]);
-
+    
         // Generate OTP
         $otpModel = $this->otpService->generateOtp($user, $request->email, 'verification');
-
+        
         // Generate verification URL
         $verificationUrl = url("/api/auth/verify-email/{$request->email}/{$otpModel->otp}");
-
+        
         // Send verification email
-        Mail::to($request->email)->send(new VerifyEmail($otpModel->otp, $verificationUrl));
-
+        Mail::to($request->email)->send(new \App\Mail\VerifyEmail($otpModel->otp, $verificationUrl));
+    
         return response()->json([
             'success' => true,
             'message' => 'Registration successful. Please check your email for verification code.',
             'user' => $user
         ], 201);
     }
+
+private function sendOtpEmail(string $email, string $otp, string $type, string $verificationUrl = null)
+{
+    $subject = match($type) {
+        'verification' => 'Verify Your Email Address',
+        'reset' => 'Reset Your Password',
+        default => 'Your OTP Code'
+    };
+    
+    \Log::info("OTP for {$email}: {$otp}");
+    
+    // Use the appropriate mailable class based on type
+    if ($type === 'verification') {
+        Mail::to($email)->send(new \App\Mail\VerifyEmail($otp, $verificationUrl));
+    } else {
+        // Handle other email types or use the original approach
+        $template = match($type) {
+            'reset' => 'emails.reset-password',
+            default => 'emails.otp'
+        };
+        
+        $data = ['otp' => $otp];
+        if ($verificationUrl) {
+            $data['verificationUrl'] = $verificationUrl;
+        }
+        
+        Mail::send($template, $data, function($message) use ($email, $subject) {
+            $message->to($email)->subject($subject);
+        });
+    }
+}
 
     /**
      * @OA\Post(
@@ -453,36 +484,39 @@ class AuthController extends Controller
      * )
      */
     public function forgotPassword(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required|string|email',
-        ]);
+{
+    $validator = Validator::make($request->all(), [
+        'email' => 'required|string|email',
+    ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => $validator->errors()->first(),
-            ], 422);
-        }
-
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User not found.',
-            ], 404);
-        }
-
-        // Generate and send OTP for password reset
-        $this->generateAndSendOtp($user, 'password_reset');
-
+    if ($validator->fails()) {
         return response()->json([
-            'success' => true,
-            'message' => 'Password reset OTP has been sent to your email.',
-            'user_id' => $user->id,
-        ]);
+            'success' => false,
+            'message' => $validator->errors()->first(),
+        ], 422);
     }
+
+    $user = User::where('email', $request->email)->first();
+
+    if (!$user) {
+        return response()->json([
+            'success' => false,
+            'message' => 'User not found.',
+        ], 404);
+    }
+
+    // Generate OTP
+    $otpModel = $this->otpService->generateOtp($user, $request->email, 'password_reset');
+    
+    // Send password reset email
+    Mail::to($request->email)->send(new \App\Mail\ResetPassword($otpModel->otp));
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Password reset OTP has been sent to your email.',
+        'user_id' => $user->id,
+    ]);
+}
 
     /**
      * @OA\Post(

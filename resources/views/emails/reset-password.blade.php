@@ -17,4 +17,4 @@ If you did not request a password reset, please ignore this email or contact sup
 
 Thanks,<br>
 {{ config('app.name') }}
-@endcomponent 
+@endcomponent

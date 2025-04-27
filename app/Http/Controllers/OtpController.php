@@ -259,16 +259,14 @@ class OtpController extends Controller
             default => 'emails.otp'
         };
         
-        // In a real application, you would use Laravel's Mail facade to send emails
-        // For now, we'll just log the OTP for testing purposes
+      
         \Log::info("OTP for {$email}: {$otp}");
         
-        // Uncomment this when you have email configuration set up
-        /*
+      
         Mail::send($template, ['otp' => $otp], function($message) use ($email, $subject) {
             $message->to($email)
                     ->subject($subject);
         });
-        */
+        
     }
 } 
