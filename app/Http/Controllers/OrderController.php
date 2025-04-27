@@ -5,10 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Cart;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
+use App\Mail\OrderNotification;
+use Illuminate\Support\Facades\Mail;
 
 class OrderController extends Controller
 {
@@ -89,6 +92,15 @@ class OrderController extends Controller
 
         // Clear the cart after order is created
         Cart::where('user_id', $request->user_id)->delete();
+
+        // Send notification to admin about new order
+        $adminUsers = User::where('role', 'ADMIN')->get();
+        foreach ($adminUsers as $admin) {
+            Mail::to($admin->email)->send(new OrderNotification($order, 'new_order'));
+        }
+
+        // Send notification to customer
+        Mail::to($order->user->email)->send(new OrderNotification($order, 'new_order'));
 
         $trafficSource = new \App\Models\TrafficSource();
         $trafficSource->source = 'get_orders';
@@ -303,7 +315,20 @@ public function show(Request $request, $id): JsonResponse
             ], 422);
         }
 
+        $oldStatus = $order->status;
         $order->update(['status' => $request->status]);
+
+        // Send notification to customer about status update
+        if ($oldStatus !== $request->status) {
+            Mail::to($order->user->email)->send(new OrderNotification($order, 'status_update'));
+        }
+
+        $trafficSource = new \App\Models\TrafficSource();
+        $trafficSource->source = 'update_order_status';
+        $trafficSource->visits = 1;
+        $trafficSource->orders = 0;
+        $trafficSource->recorded_at = now();
+        $trafficSource->save();
 
         return response()->json([
             'success' => true,
@@ -677,35 +702,27 @@ public function getRecentOrders(Request $request): JsonResponse
      */
     public function addUpdate(Request $request, $id): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'title' => 'required|string|max:255',
-            'description' => 'required|string'
+        $request->validate([
+            'message' => 'required|string'
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
         $order = Order::findOrFail($id);
-        $updates = $order->updates ?? [];
         
-        $newUpdate = [
-            'id' => 'upd-' . Str::random(8),
-            'title' => $request->title,
-            'description' => $request->description,
+        // Add update to order
+        $updates = $order->updates ?? [];
+        $updates[] = [
+            'id' => 'upd-' . Str::random(10),
+            'message' => $request->message,
             'created_at' => now()->toIso8601String()
         ];
-        
-        $updates[] = $newUpdate;
-        $order->updates = $updates;
-        $order->save();
-        
+        $order->update(['updates' => $updates]);
+
+        // Send notification to customer about admin update
+        Mail::to($order->user->email)->send(new OrderNotification($order, 'admin_update', $request->message));
+
         return response()->json([
             'success' => true,
-            'data' => $newUpdate
+            'data' => $order
         ]);
     }
 

@@ -7,6 +7,7 @@ use App\Models\Otp;
 use App\Services\OtpService;
 use App\Mail\VerifyEmail;
 use App\Mail\ResetPassword;
+use App\Mail\NewCustomerNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -117,8 +118,14 @@ class AuthController extends Controller
         // Generate verification URL
         $verificationUrl = url("/api/auth/verify-email/{$request->email}/{$otpModel->otp}");
 
-        // Send verification email
+        // Send verification email to customer
         Mail::to($request->email)->send(new VerifyEmail($otpModel->otp, $verificationUrl));
+
+        // Notify admins about new customer registration
+        $adminUsers = User::where('role', 'ADMIN')->get();
+        foreach ($adminUsers as $admin) {
+            Mail::to($admin->email)->send(new NewCustomerNotification($user));
+        }
 
         return response()->json([
             'success' => true,
