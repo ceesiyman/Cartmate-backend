@@ -1,18 +1,20 @@
 @component('mail::message')
-# Verify Your Email Address
+# Welcome to Cartmate!
 
-Thank you for registering with CartMate. Please verify your email address by clicking the button below:
+Thank you for registering with Cartmate. To complete your registration, please verify your email address.
+
+Your verification code is: **{{ $otp }}**
 
 @component('mail::button', ['url' => $verificationUrl])
 Verify Email Address
 @endcomponent
 
-Alternatively, you can use this OTP code to verify your email: **{{ $otp }}**
-
-This OTP will expire in 10 minutes.
-
 If you did not create an account, no further action is required.
 
-Thanks,<br>
-{{ config('app.name') }}
+Best regards,<br>
+The Cartmate Team
+
+@component('mail::subcopy')
+If you're having trouble clicking the "Verify Email Address" button, copy and paste the URL below into your web browser: [{{ $verificationUrl }}]({{ $verificationUrl }})
+@endcomponent
 @endcomponent 

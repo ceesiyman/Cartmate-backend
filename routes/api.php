@@ -41,18 +41,16 @@ Route::post('/otp/generate', [OtpController::class, 'generate']);
 Route::post('/otp/verify', [OtpController::class, 'verify']);
 Route::post('/otp/resend', [OtpController::class, 'resend']);
 
-// Test Email Route
+// Test email route
 Route::get('/test-email', function () {
     try {
-        $otp = '123456';
-        $verificationUrl = url("/api/auth/verify-email/bomboclat7522@gmail.com/{$otp}");
-        Mail::to('bomboclat7522@gmail.com')->send(new VerifyEmail($otp, $verificationUrl));
-        return response()->json(['message' => 'Test email sent successfully']);
+        Mail::raw('Test email content', function($message) {
+            $message->to('eridericgeorge@gmail.com')
+                   ->subject('Test Email');
+        });
+        return response()->json(['message' => 'Email sent successfully']);
     } catch (\Exception $e) {
-        return response()->json([
-            'message' => 'Failed to send email',
-            'error' => $e->getMessage()
-        ], 500);
+        return response()->json(['error' => $e->getMessage()], 500);
     }
 });
 
