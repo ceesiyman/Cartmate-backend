@@ -35,6 +35,7 @@ Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
 Route::get('/products', [ProductController::class, 'index']);
 Route::post('/products/fetch', [ProductController::class, 'fetchProduct']);
 Route::get('/products/trending', [ProductController::class, 'trending']);
+Route::get('/products/{id}', [ProductController::class, 'show']);
 
 // OTP Routes
 Route::post('/otp/generate', [OtpController::class, 'generate']);
@@ -74,7 +75,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 
     // Product Management
-    Route::get('/products/{id}', [ProductController::class, 'show']);
+   
     Route::post('/products', [ProductController::class, 'store']);
     Route::put('/products/{id}', [ProductController::class, 'update']);
     Route::delete('/products/{id}', [ProductController::class, 'destroy']);
@@ -106,6 +107,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/orders-stats', [OrderController::class, 'getOrderStats']);
     Route::get('/orders-recent', [OrderController::class, 'getRecentOrders']);
     Route::get('/orders/{id}/details', [OrderController::class, 'getOrderDetails']);
+    Route::put('/orders/{id}/tracking', [OrderController::class, 'updateTrackingNumber']);
 
     // Order Updates
     Route::get('/orders/{id}/updates', [OrderController::class, 'getUpdates']);

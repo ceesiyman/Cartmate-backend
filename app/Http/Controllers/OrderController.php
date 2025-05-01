@@ -11,7 +11,8 @@ use Illuminate\Support\Str;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use App\Mail\OrderNotification;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 
 class OrderController extends Controller
 {
@@ -334,6 +335,88 @@ public function show(Request $request, $id): JsonResponse
             'success' => true,
             'data' => $order
         ]);
+    }
+
+        /**
+     * Update tracking number for an order
+     *
+     * @OA\Put(
+     *     path="/api/orders/{id}/tracking",
+     *     operationId="updateTrackingNumber",
+     *     tags={"Orders"},
+     *     summary="Update tracking number for an order",
+     *     description="Allows admin to update the tracking number for a specific order",
+     *     security={{"sanctum": {}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="Order ID",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"tracking_number"},
+     *             @OA\Property(
+     *                 property="tracking_number",
+     *                 type="string",
+     *                 example="TRK123456789"
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Tracking number updated successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Tracking number updated successfully"),
+     *             @OA\Property(property="order", ref="#/components/schemas/Order")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=403,
+     *         description="Unauthorized action",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthorized")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Order not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Order not found")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="The tracking number field is required")
+     *         )
+     *     )
+     * )
+     */
+    public function updateTrackingNumber(Request $request, $id)
+    {
+      
+
+        $order = Order::find($id);
+
+        if (!$order) {
+            return response()->json(['message' => 'Order not found'], 404);
+        }
+
+        $validated = $request->validate([
+            'tracking_number' => 'required|string|max:255'
+        ]);
+
+        $order->tracking_number = $validated['tracking_number'];
+        $order->save();
+
+        return response()->json([
+            'message' => 'Tracking number updated successfully',
+            'order' => $order
+        ], 200);
     }
 
  /**

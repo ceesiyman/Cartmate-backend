@@ -10,7 +10,7 @@
     },
     "servers": [
         {
-            "url": "http://127.0.0.1:8000",
+            "url": "http://localhost:8000",
             "description": "Cartmate API Server"
         }
     ],
@@ -2277,6 +2277,120 @@
                         "description": "Invalid status"
                     }
                 }
+            }
+        },
+        "/api/orders/{id}/tracking": {
+            "put": {
+                "tags": [
+                    "Orders"
+                ],
+                "summary": "Update tracking number for an order",
+                "description": "Allows admin to update the tracking number for a specific order",
+                "operationId": "updateTrackingNumber",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Order ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "tracking_number"
+                                ],
+                                "properties": {
+                                    "tracking_number": {
+                                        "type": "string",
+                                        "example": "TRK123456789"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Tracking number updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Tracking number updated successfully"
+                                        },
+                                        "order": {
+                                            "$ref": "#/components/schemas/Order"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Unauthorized action",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthorized"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Order not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Order not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "The tracking number field is required"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
             }
         },
         "/api/orders-filter": {
@@ -4611,6 +4725,41 @@
                     "url": {
                         "type": "string",
                         "example": "https://amazon.com"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "TrafficSource": {
+                "title": "TrafficSource",
+                "description": "TrafficSource model",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "source": {
+                        "type": "string",
+                        "example": "Direct"
+                    },
+                    "visits": {
+                        "type": "integer",
+                        "example": 1000
+                    },
+                    "orders": {
+                        "type": "integer",
+                        "example": 50
+                    },
+                    "recorded_at": {
+                        "type": "string",
+                        "format": "date"
                     },
                     "created_at": {
                         "type": "string",
