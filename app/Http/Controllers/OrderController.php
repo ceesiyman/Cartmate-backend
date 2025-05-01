@@ -419,120 +419,155 @@ public function show(Request $request, $id): JsonResponse
         ], 200);
     }
 
- /**
- * @OA\Get(
- *     path="/api/orders-filter",
- *     summary="Get filtered orders with pagination",
- *     tags={"Orders"},
- *     @OA\Parameter(
- *         name="status",
- *         in="query",
- *         required=false,
- *         description="Filter by order status",
- *         @OA\Schema(type="string", enum={"pending", "processing", "completed", "cancelled"})
- *     ),
- *     @OA\Parameter(
- *         name="sort",
- *         in="query",
- *         required=false,
- *         description="Sort orders by creation date",
- *         @OA\Schema(type="string", enum={"newest", "oldest"}, default="newest")
- *     ),
- *     @OA\Parameter(
- *         name="page",
- *         in="query",
- *         required=false,
- *         description="Page number",
- *         @OA\Schema(type="integer", default=1)
- *     ),
- *     @OA\Parameter(
- *         name="per_page",
- *         in="query",
- *         required=false,
- *         description="Items per page",
- *         @OA\Schema(type="integer", default=15)
- *     ),
- *     @OA\Response(
- *         response=200,
- *         description="List of filtered orders with user details",
- *         @OA\JsonContent(
- *             @OA\Property(property="success", type="boolean", example=true),
- *             @OA\Property(property="data", type="object",
- *                 @OA\Property(property="current_page", type="integer", example=1),
- *                 @OA\Property(property="data", type="array", @OA\Items(
- *                     allOf={
- *                         @OA\Schema(ref="#/components/schemas/Order"),
- *                         @OA\Schema(
- *                             @OA\Property(property="user", type="object",
- *                                 @OA\Property(property="id", type="integer", example=1),
- *                                 @OA\Property(property="name", type="string", example="John Doe"),
- *                                 @OA\Property(property="email", type="string", example="john@example.com"),
- *                                 @OA\Property(property="phone", type="string", example="123-456-7890", nullable=true),
- *                                 @OA\Property(property="address", type="string", example="123 Main St", nullable=true)
- *                             )
- *                         )
- *                     }
- *                 )),
- *                 @OA\Property(property="first_page_url", type="string"),
- *                 @OA\Property(property="from", type="integer"),
- *                 @OA\Property(property="last_page", type="integer"),
- *                 @OA\Property(property="last_page_url", type="string"),
- *                 @OA\Property(property="next_page_url", type="string"),
- *                 @OA\Property(property="path", type="string"),
- *                 @OA\Property(property="per_page", type="integer"),
- *                 @OA\Property(property="prev_page_url", type="string"),
- *                 @OA\Property(property="to", type="integer"),
- *                 @OA\Property(property="total", type="integer")
- *             ),
- *             @OA\Property(property="total_orders", type="integer", example=50)
- *         )
- *     )
- * )
- */
-public function filterOrders(Request $request): JsonResponse
-{
-    $query = Order::with(['items.product', 'user']);
-    
-    // Filter by status if provided
-    if ($request->has('status') && in_array($request->status, ['pending', 'processing', 'completed', 'cancelled'])) {
-        $query->where('status', $request->status);
-    }
-    
-    // Sort by creation date
-    $sortDirection = $request->get('sort', 'newest') === 'newest' ? 'desc' : 'asc';
-    $query->orderBy('created_at', $sortDirection);
-    
-    // Get pagination parameters
-    $perPage = $request->get('per_page', 15);
-    
-    // Execute the paginated query
-    $orders = $query->paginate($perPage);
-    
-    // Format user data to include only necessary fields
-    $orders->getCollection()->transform(function ($order) {
-        // Format the user data to include only necessary fields
-        if ($order->user) {
-            $order->user = [
-                'id' => $order->user->id,
-                'name' => $order->user->name,
-                'email' => $order->user->email,
-                'phone' => $order->user->phone ?? null,
-                'address' => $order->user->address ?? null,
-            ];
+ 
+    /**
+     * @OA\Get(
+     *     path="/api/orders-filter",
+     *     summary="Get filtered orders with pagination",
+     *     tags={"Orders"},
+     *     @OA\Parameter(
+     *         name="status",
+     *         in="query",
+     *         required=false,
+     *         description="Filter by order status",
+     *         @OA\Schema(type="string", enum={"pending", "processing", "completed", "cancelled"})
+     *     ),
+     *     @OA\Parameter(
+     *         name="customer_type",
+     *         in="query",
+     *         required=false,
+     *         description="Filter by customer type",
+     *         @OA\Schema(type="string", enum={"employee", "individual", "company"})
+     *     ),
+     *     @OA\Parameter(
+     *         name="sort",
+     *         in="query",
+     *         required=false,
+     *         description="Sort orders by creation date",
+     *         @OA\Schema(type="string", enum={"newest", "oldest"}, default="newest")
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         required=false,
+     *         description="Page number",
+     *         @OA\Schema(type="integer", default=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         required=false,
+     *         description="Items per page",
+     *         @OA\Schema(type="integer", default=15)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of filtered orders with user and item details",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="data", type="array", @OA\Items(
+     *                     allOf={
+     *                         @OA\Schema(ref="#/components/schemas/Order"),
+     *                         @OA\Schema(
+     *                             @OA\Property(property="user", type="object",
+     *                                 @OA\Property(property="id", type="integer", example=1),
+     *                                 @OA\Property(property="name", type="string", example="John Doe"),
+     *                                 @OA\Property(property="email", type="string", example="john@example.com"),
+     *                                 @OA\Property(property="phone", type="string", example="123-456-7890", nullable=true),
+     *                                 @OA\Property(property="address", type="string", example="123 Main St", nullable=true),
+     *                                 @OA\Property(property="customer_type", type="string", enum={"employee", "individual", "company"})
+     *                             ),
+     *                             @OA\Property(property="items", type="array", @OA\Items(
+     *                                 @OA\Property(property="id", type="integer", example=1),
+     *                                 @OA\Property(property="description", type="string", example="Product Name"),
+     *                                 @OA\Property(property="price", type="number", format="float", example=49.99),
+     *                                 @OA\Property(property="quantity", type="integer", example=2),
+     *                                 @OA\Property(property="total", type="number", format="float", example=99.98)
+     *                             ))
+     *                         )
+     *                     }
+     *                 )),
+     *                 @OA\Property(property="first_page_url", type="string"),
+     *                 @OA\Property(property="from", type="integer"),
+     *                 @OA\Property(property="last_page", type="integer"),
+     *                 @OA\Property(property="last_page_url", type="string"),
+     *                 @OA\Property(property="next_page_url", type="string"),
+     *                 @OA\Property(property="path", type="string"),
+     *                 @OA\Property(property="per_page", type="integer"),
+     *                 @OA\Property(property="prev_page_url", type="string"),
+     *                 @OA\Property(property="to", type="integer"),
+     *                 @OA\Property(property="total", type="integer")
+     *             ),
+     *             @OA\Property(property="total_orders", type="integer", example=50)
+     *         )
+     *     )
+     * )
+     */
+    public function filterOrders(Request $request): JsonResponse
+    {
+        $query = Order::with(['items.product', 'user']);
+        
+        // Filter by status if provided
+        if ($request->has('status') && in_array($request->status, ['pending', 'processing', 'completed', 'cancelled'])) {
+            $query->where('status', $request->status);
         }
         
-        return $order;
-    });
-    
-    // Get total count of orders matching the filter criteria (considering the filters)
-    $totalOrdersCount = $query->count();
-    
-    return response()->json([
-        'success' => true,
-        'data' => $orders,
-        'total_orders' => $totalOrdersCount
-    ]);
-}
+        // Filter by customer type if provided
+        if ($request->has('customer_type') && in_array($request->customer_type, ['employee', 'individual', 'company'])) {
+            $query->whereHas('user', function ($q) use ($request) {
+                $q->where('customer_type', $request->customer_type);
+            });
+        }
+        
+        // Sort by creation date
+        $sortDirection = $request->get('sort', 'newest') === 'newest' ? 'desc' : 'asc';
+        $query->orderBy('created_at', $sortDirection);
+        
+        // Get pagination parameters
+        $perPage = $request->get('per_page', 15);
+        
+        // Execute the paginated query
+        $orders = $query->paginate($perPage);
+        
+        // Format user and items data to include only necessary fields
+        $orders->getCollection()->transform(function ($order) {
+            // Format the user data
+            if ($order->user) {
+                $order->user = [
+                    'id' => $order->user->id,
+                    'name' => $order->user->name,
+                    'email' => $order->user->email,
+                    'phone' => $order->user->phone ?? null,
+                    'address' => $order->user->address ?? null,
+                    'customer_type' => $order->user->customer_type,
+                ];
+            }
+            
+            // Format the items data
+            $order->items = $order->items->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'description' => $item->product->name ?? 'Unknown Product',
+                    'price' => floatval($item->price),
+                    'quantity' => $item->quantity,
+                    'total' => floatval($item->price * $item->quantity),
+                ];
+            })->toArray();
+            
+            return $order;
+        });
+        
+        // Get total count of orders matching the filter criteria
+        $totalOrdersCount = $query->count();
+        
+        return response()->json([
+            'success' => true,
+            'data' => $orders,
+            'total_orders' => $totalOrdersCount
+        ]);
+    }
 /**
  * @OA\Get(
  *     path="/api/orders/{id}/details",

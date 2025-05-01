@@ -31,7 +31,8 @@
                                     "name",
                                     "email",
                                     "password",
-                                    "password_confirmation"
+                                    "password_confirmation",
+                                    "customer_type"
                                 ],
                                 "properties": {
                                     "name": {
@@ -56,6 +57,16 @@
                                         "type": "string",
                                         "format": "password",
                                         "example": "password123"
+                                    },
+                                    "customer_type": {
+                                        "description": "Type of customer",
+                                        "type": "string",
+                                        "enum": [
+                                            "employee",
+                                            "individual",
+                                            "company"
+                                        ],
+                                        "example": "individual"
                                     }
                                 },
                                 "type": "object"
@@ -78,9 +89,26 @@
                                             "type": "string",
                                             "example": "Registration successful. Please verify your email."
                                         },
-                                        "user_id": {
-                                            "type": "integer",
-                                            "example": 1
+                                        "user": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "name": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                },
+                                                "email": {
+                                                    "type": "string",
+                                                    "example": "john@example.com"
+                                                },
+                                                "customer_type": {
+                                                    "type": "string",
+                                                    "example": "individual"
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
@@ -2548,6 +2576,20 @@
                         }
                     },
                     {
+                        "name": "customer_type",
+                        "in": "query",
+                        "description": "Filter by customer type",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "employee",
+                                "individual",
+                                "company"
+                            ]
+                        }
+                    },
+                    {
                         "name": "sort",
                         "in": "query",
                         "description": "Sort orders by creation date",
@@ -2584,7 +2626,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "List of filtered orders with user details",
+                        "description": "List of filtered orders with user and item details",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2631,9 +2673,47 @@
                                                                                 "type": "string",
                                                                                 "example": "123 Main St",
                                                                                 "nullable": true
+                                                                            },
+                                                                            "customer_type": {
+                                                                                "type": "string",
+                                                                                "enum": [
+                                                                                    "employee",
+                                                                                    "individual",
+                                                                                    "company"
+                                                                                ]
                                                                             }
                                                                         },
                                                                         "type": "object"
+                                                                    },
+                                                                    "items": {
+                                                                        "type": "array",
+                                                                        "items": {
+                                                                            "properties": {
+                                                                                "id": {
+                                                                                    "type": "integer",
+                                                                                    "example": 1
+                                                                                },
+                                                                                "description": {
+                                                                                    "type": "string",
+                                                                                    "example": "Product Name"
+                                                                                },
+                                                                                "price": {
+                                                                                    "type": "number",
+                                                                                    "format": "float",
+                                                                                    "example": 49.99
+                                                                                },
+                                                                                "quantity": {
+                                                                                    "type": "integer",
+                                                                                    "example": 2
+                                                                                },
+                                                                                "total": {
+                                                                                    "type": "number",
+                                                                                    "format": "float",
+                                                                                    "example": 99.98
+                                                                                }
+                                                                            },
+                                                                            "type": "object"
+                                                                        }
                                                                     }
                                                                 },
                                                                 "type": "object"
@@ -3898,39 +3978,11 @@
                 "tags": [
                     "Products"
                 ],
-                "summary": "Get all active products",
+                "summary": "Get all products",
                 "operationId": "1bfaa78d1c2c3848ab8165c5dadcad3e",
-                "parameters": [
-                    {
-                        "name": "category",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "page",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "default": 1
-                        }
-                    },
-                    {
-                        "name": "per_page",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "default": 12
-                        }
-                    }
-                ],
                 "responses": {
                     "200": {
-                        "description": "List of products",
+                        "description": "Products retrieved successfully",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3940,7 +3992,10 @@
                                             "example": true
                                         },
                                         "data": {
-                                            "type": "object"
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
                                         }
                                     },
                                     "type": "object"
@@ -4661,6 +4716,14 @@
                                     "image": {
                                         "type": "file",
                                         "format": "binary"
+                                    },
+                                    "vat": {
+                                        "type": "string",
+                                        "example": "GB123456789"
+                                    },
+                                    "tin": {
+                                        "type": "string",
+                                        "example": "123456789"
                                     }
                                 },
                                 "type": "object"
@@ -4700,6 +4763,20 @@
                                                 "image": {
                                                     "type": "string",
                                                     "example": "userimage/user1.jpg"
+                                                },
+                                                "customer_type": {
+                                                    "type": "string",
+                                                    "example": "company"
+                                                },
+                                                "vat": {
+                                                    "type": "string",
+                                                    "example": "GB123456789",
+                                                    "nullable": true
+                                                },
+                                                "tin": {
+                                                    "type": "string",
+                                                    "example": "123456789",
+                                                    "nullable": true
                                                 },
                                                 "email_verified_at": {
                                                     "type": "string",
@@ -4759,6 +4836,26 @@
                                         "message": {
                                             "type": "string",
                                             "example": "User not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Operation not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "VAT and TIN updates are only allowed for company or employee users"
                                         }
                                     },
                                     "type": "object"

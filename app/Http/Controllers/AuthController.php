@@ -32,107 +32,127 @@ class AuthController extends Controller
         $this->otpService = $otpService;
     }
 
-    /**
-     * @OA\Post(
-     *     path="/api/auth/register",
-     *     summary="Register a new user",
-     *     tags={"Authentication"},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"name", "email", "password", "password_confirmation"},
-     *             @OA\Property(
-     *                 property="name",
-     *                 type="string",
-     *                 description="User's full name",
-     *                 example="John Doe"
-     *             ),
-     *             @OA\Property(
-     *                 property="email",
-     *                 type="string",
-     *                 format="email",
-     *                 description="User's email address",
-     *                 example="john@example.com"
-     *             ),
-     *             @OA\Property(
-     *                 property="password",
-     *                 type="string",
-     *                 format="password",
-     *                 description="User's password",
-     *                 example="password123"
-     *             ),
-     *             @OA\Property(
-     *                 property="password_confirmation",
-     *                 type="string",
-     *                 format="password",
-     *                 description="Password confirmation",
-     *                 example="password123"
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Registration successful, OTP sent",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Registration successful. Please verify your email."),
-     *             @OA\Property(property="user_id", type="integer", example=1)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="The email has already been taken.")
-     *         )
-     *     )
-     * )
-     */
-    public function register(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8|confirmed',
-        ]);
-    
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-    
-        // Create user with unverified email
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
-    
-        // Generate OTP
-        $otpModel = $this->otpService->generateOtp($user, $request->email, 'verification');
-        
-        // Generate verification URL
-        $verificationUrl = url("/api/auth/verify-email/{$request->email}/{$otpModel->otp}");
 
-        // Send verification email to customer
-        Mail::to($request->email)->send(new VerifyEmail($otpModel->otp, $verificationUrl));
+/**
+ * @OA\Post(
+ *     path="/api/auth/register",
+ *     summary="Register a new user",
+ *     tags={"Authentication"},
+ *     @OA\RequestBody(
+ *         required=true,
+ *         @OA\JsonContent(
+ *             required={"name", "email", "password", "password_confirmation", "customer_type"},
+ *             @OA\Property(
+ *                 property="name",
+ *                 type="string",
+ *                 description="User's full name",
+ *                 example="John Doe"
+ *             ),
+ *             @OA\Property(
+ *                 property="email",
+ *                 type="string",
+ *                 format="email",
+ *                 description="User's email address",
+ *                 example="john@example.com"
+ *             ),
+ *             @OA\Property(
+ *                 property="password",
+ *                 type="string",
+ *                 format="password",
+ *                 description="User's password",
+ *                 example="password123"
+ *             ),
+ *             @OA\Property(
+ *                 property="password_confirmation",
+ *                 type="string",
+ *                 format="password",
+ *                 description="Password confirmation",
+ *                 example="password123"
+ *             ),
+ *             @OA\Property(
+ *                 property="customer_type",
+ *                 type="string",
+ *                 description="Type of customer",
+ *                 enum={"employee", "individual", "company"},
+ *                 example="individual"
+ *             )
+ *         )
+ *     ),
+ *     @OA\Response(
+ *         response=200,
+ *         description="Registration successful, OTP sent",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=true),
+ *             @OA\Property(property="message", type="string", example="Registration successful. Please verify your email."),
+ *             @OA\Property(property="user", type="object",
+ *                 @OA\Property(property="id", type="integer", example=1),
+ *                 @OA\Property(property="name", type="string", example="John Doe"),
+ *                 @OA\Property(property="email", type="string", example="john@example.com"),
+ *                 @OA\Property(property="customer_type", type="string", example="individual")
+ *             )
+ *         )
+ *     ),
+ *     @OA\Response(
+ *         response=422,
+ *         description="Validation error",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=false),
+ *             @OA\Property(property="message", type="string", example="The email has already been taken.")
+ *         )
+ *     )
+ * )
+ */
+public function register(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'name' => 'required|string|max:255',
+        'email' => 'required|string|email|max:255|unique:users',
+        'password' => 'required|string|min:8|confirmed',
+        'customer_type' => 'required|string|in:employee,individual,company',
+    ]);
 
-        // Notify admins about new customer registration
-        $adminUsers = User::where('role', 'ADMIN')->get();
-        foreach ($adminUsers as $admin) {
-            Mail::to($admin->email)->send(new NewCustomerNotification($user));
-        }
-
+    if ($validator->fails()) {
         return response()->json([
-            'success' => true,
-            'message' => 'Registration successful. Please check your email for verification code.',
-            'user' => $user
-        ], 201);
+            'success' => false,
+            'message' => 'Validation failed',
+            'errors' => $validator->errors()
+        ], 422);
     }
+
+    // Create user with unverified email
+    $user = User::create([
+        'name' => $request->name,
+        'email' => $request->email,
+        'password' => Hash::make($request->password),
+        'customer_type' => $request->customer_type,
+    ]);
+
+    // Generate OTP
+    $otpModel = $this->otpService->generateOtp($user, $request->email, 'verification');
+    
+    // Generate verification URL
+    $verificationUrl = url("/api/auth/verify-email/{$request->email}/{$otpModel->otp}");
+
+    // Send verification email to customer
+    Mail::to($request->email)->send(new VerifyEmail($otpModel->otp, $verificationUrl));
+
+    // Notify admins about new customer registration
+    $adminUsers = User::where('role', 'ADMIN')->get();
+    foreach ($adminUsers as $admin) {
+        Mail::to($admin->email)->send(new NewCustomerNotification($user));
+    }
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Registration successful. Please check your email for verification code.',
+        'user' => [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'customer_type' => $user->customer_type,
+        ]
+    ], 201);
+}
 
 private function sendOtpEmail(string $email, string $otp, string $type, string $verificationUrl = null)
 {
