@@ -18,6 +18,16 @@ class Kernel extends ConsoleKernel
         // Run daily at 1 AM to aggregate yesterday's traffic
         $schedule->command('traffic:aggregate')->dailyAt('01:00');
     }
-    
-    // ...
+
+    /**
+     * Register the commands for the application.
+     *
+     * @return void
+     */
+    protected function commands()
+    {
+        $this->load(__DIR__.'/Commands');
+
+        require base_path('routes/console.php');
+    }
 }

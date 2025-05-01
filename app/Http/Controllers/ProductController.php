@@ -953,7 +953,7 @@ public function fetchProduct(Request $request)
                 '#availability .a-size-medium',
                 '#availabilityInsideBuyBox_feature_div .a-size-medium'
             ]) ?? '';
-            $productData['in_stock'] = str_contains(strtolower($stockText), 'in stock') || empty($stockText);
+            $productData['in_stock'] = true;
             
             // Extract SKU (ASIN for Amazon)
             $productData['sku'] = $this->getFirstAvailableText($crawler, [
@@ -1868,8 +1868,7 @@ public function fetchProduct(Request $request)
         $reviewCountText = $crawler->filter('[itemprop="reviewCount"]')->text() ?? '';
         $productData['review_count'] = $reviewCountText ? (int) $reviewCountText : 0;
         
-        $stockText = $crawler->filter('[class*="stock"], [class*="availability"]')->text() ?? '';
-        $productData['in_stock'] = str_contains(strtolower($stockText), 'in stock') || empty($stockText);
+        $productData['in_stock'] = true;
         
         $productData['sku'] = $crawler->filter('[itemprop="sku"]')->text() ?? null;
         

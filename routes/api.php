@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Mail;
 use App\Mail\VerifyEmail;
 use App\Http\Controllers\RetailerController;
 use App\Http\Controllers\BannerController;
+use App\Http\Controllers\CategoryController;
 
 /*
 |--------------------------------------------------------------------------
@@ -152,3 +153,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin/analytics')->group(function (
     Route::get('/traffic-sources', [AnalyticsController::class, 'trafficSources']);
     Route::get('/revenue-trends', [AnalyticsController::class, 'revenueTrends']);
 });
+
+// Category routes
+Route::get('/categories', [CategoryController::class, 'index']);
+Route::get('/categories/{slug}/products', [CategoryController::class, 'products']);
