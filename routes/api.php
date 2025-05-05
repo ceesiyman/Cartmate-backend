@@ -143,13 +143,14 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::put('/banners/{id}', [BannerController::class, 'update']);
     Route::delete('/banners/{id}', [BannerController::class, 'destroy']);
 
-   
-});
-
- //BUlk Offer Email Routes
+    //BUlk Offer Email Routes
  Route::post('/emails/bulk', [EmailSubscriptionController::class, 'sendBulkEmails']);
  Route::put('/users/{userId}/subscription', [EmailSubscriptionController::class, 'updateSubscription']);
  Route::get('/users/subscribed/count', [UserController::class, 'getSubscribedUsersCount']);
+   
+});
+
+ 
 
 Route::middleware(['auth:sanctum'])->prefix('admin/analytics')->group(function () {
     Route::get('/key-metrics', [AnalyticsController::class, 'keyMetrics']);
