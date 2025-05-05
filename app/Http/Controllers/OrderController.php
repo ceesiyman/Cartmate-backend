@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Validator;
 use App\Mail\OrderNotification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Mail;
 
 class OrderController extends Controller
 {
@@ -24,7 +25,7 @@ class OrderController extends Controller
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             @OA\Property(property="user_id", type="integer", example=1),
+     *             @OA\Property(property="user_id", type="string", example="905932a9-dbaf-49cd-bca9-451914c71d19"),
      *             @OA\Property(property="shipping_address", type="string", example="123 Main St, City, Country"),
      *             @OA\Property(property="billing_address", type="string", example="123 Main St, City, Country"),
      *             @OA\Property(property="phone_number", type="string", example="+1234567890"),
@@ -48,29 +49,29 @@ class OrderController extends Controller
     public function store(Request $request): JsonResponse
     {
         $request->validate([
-            'user_id' => 'required|integer|exists:users,id',
+            'user_id' => 'required|string|size:36|exists:users,id',
             'shipping_address' => 'required|string',
             'billing_address' => 'required|string',
             'phone_number' => 'required|string',
             'notes' => 'nullable|string'
         ]);
-
+    
         $cartItems = Cart::where('user_id', $request->user_id)
             ->join('products', 'carts.product_id', '=', 'products.id')
             ->select('carts.*', 'products.total_price as product_price')
             ->get();
-
+    
         if ($cartItems->isEmpty()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Cart is empty'
             ], 422);
         }
-
+    
         $totalAmount = $cartItems->sum(function ($item) {
             return $item->quantity * $item->product_price;
         });
-
+    
         $order = Order::create([
             'user_id' => $request->user_id,
             'order_number' => 'ORD-' . strtoupper(Str::random(10)),
@@ -81,7 +82,7 @@ class OrderController extends Controller
             'phone_number' => $request->phone_number,
             'notes' => $request->notes
         ]);
-
+    
         foreach ($cartItems as $item) {
             OrderItem::create([
                 'order_id' => $order->id,
@@ -90,26 +91,26 @@ class OrderController extends Controller
                 'price' => $item->product_price
             ]);
         }
-
+    
         // Clear the cart after order is created
         Cart::where('user_id', $request->user_id)->delete();
-
+    
         // Send notification to admin about new order
         $adminUsers = User::where('role', 'ADMIN')->get();
         foreach ($adminUsers as $admin) {
             Mail::to($admin->email)->send(new OrderNotification($order, 'new_order'));
         }
-
+    
         // Send notification to customer
         Mail::to($order->user->email)->send(new OrderNotification($order, 'new_order'));
-
+    
         $trafficSource = new \App\Models\TrafficSource();
         $trafficSource->source = 'get_orders';
         $trafficSource->visits = 1;
         $trafficSource->orders = 1;
         $trafficSource->recorded_at = now();
         $trafficSource->save();
-
+    
         return response()->json([
             'success' => true,
             'data' => $order->load('items.product')
@@ -126,7 +127,7 @@ class OrderController extends Controller
      *         in="query",
      *         required=true,
      *         description="User ID",
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string")
      *     ),
      *     @OA\Response(
      *         response=200,

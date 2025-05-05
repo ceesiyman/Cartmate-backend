@@ -8,13 +8,18 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\Otp;
+use Illuminate\Support\Str;
 use App\Models\Order;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
-
+  // Disable auto-incrementing primary key
+  public $incrementing = false;
+    
+  // Set the primary key type to string
+  protected $keyType = 'string';
     /**
      * The attributes that are mass assignable.
      *
@@ -28,6 +33,7 @@ class User extends Authenticatable
         'role',
         'password',
         'customer_type',
+        'email_subscribed',
         'tin',
         'vat',
     ];
@@ -50,8 +56,21 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'email_subscribed' => 'boolean',
     ];
 
+    // Add UUID generation when creating a new model
+    protected static function boot()
+    {
+        parent::boot();
+        
+        static::creating(function ($model) {
+            if (!$model->id) {
+                $model->id = (string) Str::uuid();
+            }
+        });
+    }
+    
     /**
      * Get the OTPs for the user.
      */

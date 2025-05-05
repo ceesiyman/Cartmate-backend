@@ -24,7 +24,7 @@ class UserController extends Controller
      *         name="user_id",
      *         in="query",
      *         required=true,
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string")
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -35,7 +35,7 @@ class UserController extends Controller
      *             @OA\Property(
      *                 property="data",
      *                 type="object",
-     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="id", type="string", example="string"),
      *                 @OA\Property(property="name", type="string", example="John Doe"),
      *                 @OA\Property(property="email", type="string", example="john@example.com"),
      *                 @OA\Property(property="image", type="string", example="userimage/user1.jpg"),
@@ -67,7 +67,7 @@ class UserController extends Controller
     public function getUser(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'user_id' => 'required|integer|exists:users,id'
+            'user_id' => 'required|string|size:36|exists:users,id',
         ]);
 
         if ($validator->fails()) {
@@ -104,7 +104,7 @@ class UserController extends Controller
  *         @OA\MediaType(
  *             mediaType="multipart/form-data",
  *             @OA\Schema(
- *                 @OA\Property(property="user_id", type="integer", example=1),
+ *                 @OA\Property(property="user_id", type="string", example="string"),
  *                 @OA\Property(property="name", type="string", example="John Doe"),
  *                 @OA\Property(property="email", type="string", format="email", example="john@example.com"),
  *                 @OA\Property(property="image", type="file", format="binary"),
@@ -166,7 +166,7 @@ public function updateUser(Request $request)
 {
     // First validate just the user_id to find the user
     $idValidator = Validator::make($request->all(), [
-        'user_id' => 'required|integer|exists:users,id'
+        'user_id' => 'required|string|size:36|exists:users,id',
     ]);
 
     if ($idValidator->fails()) {
@@ -281,5 +281,23 @@ public function updateUser(Request $request)
         'message' => 'User updated successfully',
         'data' => $user
     ], 200);
+}
+
+public function getSubscribedUsersCount(Request $request)
+{
+    try {
+        $count = User::where('email_subscribed', true)->count();
+
+        return response()->json([
+            'success' => true,
+            'data' => ['count' => $count],
+        ], 200);
+    } catch (\Exception $e) {
+        \Log::error('Failed to fetch subscribed users count: ' . $e->getMessage());
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to fetch subscribed users count.',
+        ], 500);
+    }
 }
 }

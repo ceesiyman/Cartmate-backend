@@ -27,7 +27,7 @@ class CategoryController extends Controller
      *                 property="data",
      *                 type="array",
      *                 @OA\Items(
-     *                     @OA\Property(property="id", type="integer"),
+     *                     @OA\Property(property="id", type="string"),
      *                     @OA\Property(property="name", type="string"),
      *                     @OA\Property(property="slug", type="string"),
      *                     @OA\Property(property="description", type="string"),

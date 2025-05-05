@@ -1280,6 +1280,105 @@ public function fetchProduct(Request $request)
                 } elseif (!empty($data['productInfoComponent']['description'])) {
                     $productData['description'] = $data['productInfoComponent']['description'];
                 }
+                
+                // NEW: Extract specifications
+                $productData['specifications'] = [];
+                if (!empty($data['specsModule']['props'])) {
+                    foreach ($data['specsModule']['props'] as $spec) {
+                        if (isset($spec['attrName']) && isset($spec['attrValue'])) {
+                            $productData['specifications'][$spec['attrName']] = $spec['attrValue'];
+                        }
+                    }
+                } elseif (!empty($data['productInfoComponent']['properties'])) {
+                    foreach ($data['productInfoComponent']['properties'] as $spec) {
+                        if (isset($spec['name']) && isset($spec['value'])) {
+                            $productData['specifications'][$spec['name']] = $spec['value'];
+                        }
+                    }
+                }
+                
+                // NEW: Extract rating
+                if (!empty($data['feedbackModule']['averageStar'])) {
+                    $productData['rating'] = floatval($data['feedbackModule']['averageStar']);
+                } elseif (!empty($data['productInfoComponent']['avgStar'])) {
+                    $productData['rating'] = floatval($data['productInfoComponent']['avgStar']);
+                } else {
+                    $productData['rating'] = null;
+                }
+                
+                // NEW: Extract review count
+                if (!empty($data['feedbackModule']['totalValidNum'])) {
+                    $productData['review_count'] = (int) $data['feedbackModule']['totalValidNum'];
+                } elseif (!empty($data['productInfoComponent']['feedbackCount'])) {
+                    $productData['review_count'] = (int) $data['productInfoComponent']['feedbackCount'];
+                } else {
+                    $productData['review_count'] = 0;
+                }
+                
+                // NEW: Extract stock status
+                $productData['in_stock'] = true; // Default to true
+                if (isset($data['inventoryModule']['totalAvailQuantity'])) {
+                    $productData['in_stock'] = ((int) $data['inventoryModule']['totalAvailQuantity']) > 0;
+                } elseif (isset($data['productInfoComponent']['availableQuantity'])) {
+                    $productData['in_stock'] = ((int) $data['productInfoComponent']['availableQuantity']) > 0;
+                }
+                
+                // NEW: Extract SKU
+                if (!empty($data['productInfoComponent']['productId'])) {
+                    $productData['sku'] = $data['productInfoComponent']['productId'];
+                } elseif (!empty($data['productId'])) {
+                    $productData['sku'] = $data['productId'];
+                } elseif (preg_match('/"productId":"([^"]+)"/', $html, $matches)) {
+                    $productData['sku'] = $matches[1];
+                } else {
+                    $productData['sku'] = null;
+                }
+                
+                // NEW: Extract brand
+                if (!empty($data['specsModule']['brand'])) {
+                    $productData['brand'] = $data['specsModule']['brand'];
+                } elseif (!empty($data['productInfoComponent']['brand'])) {
+                    $productData['brand'] = $data['productInfoComponent']['brand'];
+                } elseif (preg_match('/"brand":"([^"]+)"/', $html, $matches)) {
+                    $productData['brand'] = $matches[1];
+                } else {
+                    $productData['brand'] = null;
+                }
+                
+                // NEW: Extract category
+                $productData['category'] = null;
+                if (!empty($data['breadcrumbModule']['pathList'])) {
+                    $categories = array_map(function($cat) {
+                        return $cat['name'] ?? '';
+                    }, $data['breadcrumbModule']['pathList']);
+                    $productData['category'] = implode(' > ', array_filter($categories));
+                } elseif (!empty($data['productInfoComponent']['categories'])) {
+                    $categories = array_map(function($cat) {
+                        return $cat['name'] ?? '';
+                    }, $data['productInfoComponent']['categories']);
+                    $productData['category'] = implode(' > ', array_filter($categories));
+                }
+                
+                // NEW: Extract features
+                $productData['features'] = [];
+                if (!empty($data['descriptionModule']['features'])) {
+                    $productData['features'] = $data['descriptionModule']['features'];
+                } elseif (!empty($data['productInfoComponent']['features'])) {
+                    $productData['features'] = $data['productInfoComponent']['features'];
+                }
+                
+                // NEW: Extract additional info (color, size, etc.)
+                $productData['additional_info'] = [];
+                if (!empty($data['skuModule']['productSKUPropertyList'])) {
+                    foreach ($data['skuModule']['productSKUPropertyList'] as $property) {
+                        if (isset($property['skuPropertyName']) && isset($property['skuPropertyValues'])) {
+                            $values = array_map(function($val) {
+                                return $val['propertyValueDisplayName'] ?? '';
+                            }, $property['skuPropertyValues']);
+                            $productData['additional_info'][$property['skuPropertyName']] = implode(', ', array_filter($values));
+                        }
+                    }
+                }
             }
             
             // If JSON extraction failed, try meta tags
@@ -1323,6 +1422,56 @@ public function fetchProduct(Request $request)
                 }
             }
             
+            // NEW: Try to extract rating from the DOM if not found
+            if (empty($productData['rating'])) {
+                try {
+                    $ratingSelectors = [
+                        '.product-reviewer-reviews span:first-child',
+                        '.seller-info-value .rating-value',
+                        '[class*="StrategyRatingStars"] [class*="StrategyRatingStarsText"]'
+                    ];
+                    
+                    foreach ($ratingSelectors as $selector) {
+                        $ratingElement = $crawler->filter($selector);
+                        if ($ratingElement->count() > 0) {
+                            $ratingText = $ratingElement->text();
+                            $rating = floatval(preg_replace('/[^0-9.]/', '', $ratingText));
+                            if ($rating > 0) {
+                                $productData['rating'] = $rating;
+                                break;
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Failed to extract AliExpress rating from DOM: ' . $e->getMessage());
+                }
+            }
+            
+            // NEW: Try to extract review count from the DOM if not found
+            if (empty($productData['review_count'])) {
+                try {
+                    $reviewCountSelectors = [
+                        '.product-reviewer-sold',
+                        '.product-reviewer-reviews',
+                        '[class*="ReviewsCount"]'
+                    ];
+                    
+                    foreach ($reviewCountSelectors as $selector) {
+                        $reviewCountElement = $crawler->filter($selector);
+                        if ($reviewCountElement->count() > 0) {
+                            $reviewCountText = $reviewCountElement->text();
+                            $reviewCount = (int) preg_replace('/[^0-9]/', '', $reviewCountText);
+                            if ($reviewCount > 0) {
+                                $productData['review_count'] = $reviewCount;
+                                break;
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Failed to extract AliExpress review count from DOM: ' . $e->getMessage());
+                }
+            }
+            
             // Clean up the data
             $productData['name'] = html_entity_decode(trim($productData['name']));
             $productData['description'] = html_entity_decode(trim($productData['description'] ?? ''));
@@ -1361,209 +1510,472 @@ public function fetchProduct(Request $request)
      * @return array
      */
     private function parseAlibabaProduct($crawler, $productData)
-    {
-        try {
-            $html = $crawler->html();
+{
+    try {
+        $html = $crawler->html();
+        
+        // Try to extract JSON data from various script tags
+        $patterns = [
+            '/window\.__INIT_DATA__\s*=\s*({.+?});/s',
+            '/window\.__DATA__\s*=\s*({.+?});/s',
+            '/window\.__GLOBAL_DATA__\s*=\s*({.+?});/s',
+            '/"data":\s*({.+?})\s*,[\s\n]*"csrfToken"/s',
+            '/window\.__page_data__\s*=\s*({.+?});/s'
+        ];
+        
+        $jsonData = null;
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $html, $matches)) {
+                try {
+                    $jsonData = json_decode($matches[1], true);
+                    if ($jsonData) {
+                        Log::info('Successfully matched Alibaba pattern: ' . $pattern);
+                        break;
+                    }
+                } catch (\Exception $e) {
+                    continue;
+                }
+            }
+        }
+        
+        if ($jsonData) {
+            // Extract data from JSON
+            $data = $jsonData['data'] ?? $jsonData;
             
-            // Try to extract JSON data from various script tags
-            $patterns = [
-                '/window\.__INIT_DATA__\s*=\s*({.+?});/s',
-                '/window\.__DATA__\s*=\s*({.+?});/s',
-                '/window\.__GLOBAL_DATA__\s*=\s*({.+?});/s',
-                '/"data":\s*({.+?})\s*,[\s\n]*"csrfToken"/s',
-                '/window\.__page_data__\s*=\s*({.+?});/s'
+            // Extract product name
+            if (!empty($data['productInfo']['subject'])) {
+                $productData['name'] = $data['productInfo']['subject'];
+            } elseif (!empty($data['metaInfo']['title'])) {
+                $productData['name'] = $data['metaInfo']['title'];
+            } elseif (!empty($data['title'])) {
+                $productData['name'] = $data['title'];
+            }
+            
+            // Extract price
+            if (!empty($data['priceInfo'])) {
+                $priceInfo = $data['priceInfo'];
+                if (!empty($priceInfo['price'])) {
+                    $productData['original_price'] = floatval($priceInfo['price']);
+                } elseif (!empty($priceInfo['minPrice'])) {
+                    $productData['original_price'] = floatval($priceInfo['minPrice']);
+                }
+            }
+            
+            // Extract images
+            if (!empty($data['imageList'])) {
+                $productData['images'] = array_map(function($img) {
+                    return !empty($img['fullPathImageURI']) ? $img['fullPathImageURI'] : $img['imageURI'];
+                }, $data['imageList']);
+                $productData['image'] = $productData['images'][0] ?? '';
+            } elseif (!empty($data['productInfo']['imageList'])) {
+                $productData['images'] = $data['productInfo']['imageList'];
+                $productData['image'] = $productData['images'][0] ?? '';
+            }
+            
+            // Extract description
+            if (!empty($data['productInfo']['description'])) {
+                $productData['description'] = $data['productInfo']['description'];
+            } elseif (!empty($data['description'])) {
+                $productData['description'] = $data['description'];
+            }
+            
+            // NEW: Extract specifications
+            $productData['specifications'] = [];
+            if (!empty($data['productInfo']['attributes'])) {
+                foreach ($data['productInfo']['attributes'] as $attr) {
+                    if (isset($attr['name']) && isset($attr['value'])) {
+                        $productData['specifications'][$attr['name']] = $attr['value'];
+                    }
+                }
+            } elseif (!empty($data['specifications'])) {
+                foreach ($data['specifications'] as $spec) {
+                    if (isset($spec['name']) && isset($spec['value'])) {
+                        $productData['specifications'][$spec['name']] = $spec['value'];
+                    }
+                }
+            } elseif (!empty($data['productAttribute'])) {
+                foreach ($data['productAttribute'] as $attr) {
+                    if (isset($attr['attrName']) && isset($attr['attrValue'])) {
+                        $productData['specifications'][$attr['attrName']] = $attr['attrValue'];
+                    }
+                }
+            }
+            
+            // NEW: Extract rating
+            if (!empty($data['productInfo']['rating'])) {
+                $productData['rating'] = floatval($data['productInfo']['rating']);
+            } elseif (!empty($data['feedbackInfo']['rating'])) {
+                $productData['rating'] = floatval($data['feedbackInfo']['rating']);
+            } elseif (!empty($data['supplierInfo']['rating'])) {
+                $productData['rating'] = floatval($data['supplierInfo']['rating']);
+            } else {
+                $productData['rating'] = null;
+            }
+            
+            // NEW: Extract review count
+            if (!empty($data['productInfo']['reviewCount'])) {
+                $productData['review_count'] = (int) $data['productInfo']['reviewCount'];
+            } elseif (!empty($data['feedbackInfo']['reviewCount'])) {
+                $productData['review_count'] = (int) $data['feedbackInfo']['reviewCount'];
+            } elseif (!empty($data['supplierInfo']['reviewCount'])) {
+                $productData['review_count'] = (int) $data['supplierInfo']['reviewCount'];
+            } else {
+                $productData['review_count'] = 0;
+            }
+            
+            // NEW: Extract stock status
+            $productData['in_stock'] = true; // Default to true
+            if (isset($data['productInfo']['inStock'])) {
+                $productData['in_stock'] = (bool) $data['productInfo']['inStock'];
+            } elseif (isset($data['inventoryInfo']['available'])) {
+                $productData['in_stock'] = (bool) $data['inventoryInfo']['available'];
+            } elseif (isset($data['priceInfo']['availableStock']) && $data['priceInfo']['availableStock'] !== null) {
+                $productData['in_stock'] = ((int) $data['priceInfo']['availableStock']) > 0;
+            }
+            
+            // NEW: Extract SKU
+            if (!empty($data['productInfo']['productID'])) {
+                $productData['sku'] = $data['productInfo']['productID'];
+            } elseif (!empty($data['productId'])) {
+                $productData['sku'] = $data['productId'];
+            } elseif (!empty($data['productInfo']['id'])) {
+                $productData['sku'] = $data['productInfo']['id'];
+            } elseif (preg_match('/"productId":"([^"]+)"/', $html, $matches)) {
+                $productData['sku'] = $matches[1];
+            } else {
+                $productData['sku'] = null;
+            }
+            
+            // NEW: Extract brand
+            if (!empty($data['productInfo']['brand'])) {
+                $productData['brand'] = $data['productInfo']['brand'];
+            } elseif (!empty($data['supplierInfo']['companyName'])) {
+                $productData['brand'] = $data['supplierInfo']['companyName'];
+            } elseif (!empty($data['companyName'])) {
+                $productData['brand'] = $data['companyName'];
+            } else {
+                $productData['brand'] = null;
+            }
+            
+            // NEW: Extract category
+            $productData['category'] = null;
+            if (!empty($data['breadcrumb'])) {
+                $categories = array_map(function($cat) {
+                    return $cat['name'] ?? '';
+                }, $data['breadcrumb']);
+                $productData['category'] = implode(' > ', array_filter($categories));
+            } elseif (!empty($data['productInfo']['categoryPath'])) {
+                $categories = array_map(function($cat) {
+                    return $cat['name'] ?? '';
+                }, $data['productInfo']['categoryPath']);
+                $productData['category'] = implode(' > ', array_filter($categories));
+            } elseif (!empty($data['categoryPath'])) {
+                $productData['category'] = is_array($data['categoryPath']) ? 
+                    implode(' > ', array_filter($data['categoryPath'])) : $data['categoryPath'];
+            }
+            
+            // NEW: Extract features
+            $productData['features'] = [];
+            if (!empty($data['productInfo']['features'])) {
+                $productData['features'] = is_array($data['productInfo']['features']) ?
+                    $data['productInfo']['features'] : [$data['productInfo']['features']];
+            } elseif (!empty($data['highlights'])) {
+                $productData['features'] = is_array($data['highlights']) ?
+                    $data['highlights'] : [$data['highlights']];
+            }
+            
+            // NEW: Extract additional info (color, size, etc.)
+            $productData['additional_info'] = [];
+            if (!empty($data['productInfo']['skuProps'])) {
+                foreach ($data['productInfo']['skuProps'] as $prop) {
+                    if (isset($prop['name']) && isset($prop['values'])) {
+                        $values = array_map(function($val) {
+                            return $val['name'] ?? '';
+                        }, $prop['values']);
+                        $productData['additional_info'][$prop['name']] = implode(', ', array_filter($values));
+                    }
+                }
+            } elseif (!empty($data['skuInfo'])) {
+                foreach ($data['skuInfo'] as $sku) {
+                    if (isset($sku['name']) && isset($sku['values'])) {
+                        $values = array_map(function($val) {
+                            return $val['displayName'] ?? $val['name'] ?? '';
+                        }, $sku['values']);
+                        $productData['additional_info'][$sku['name']] = implode(', ', array_filter($values));
+                    }
+                }
+            }
+        }
+        
+        // Fallback to DOM selectors if JSON extraction fails
+        if (empty($productData['name'])) {
+            $nameSelectors = [
+                '.product-title',
+                '.product-name',
+                'h1.title',
+                '.mod-detail-title h1',
+                'meta[property="og:title"]'
             ];
             
-            $jsonData = null;
-            foreach ($patterns as $pattern) {
-                if (preg_match($pattern, $html, $matches)) {
-                    try {
-                        $jsonData = json_decode($matches[1], true);
-                        if ($jsonData) {
-                            Log::info('Successfully matched Alibaba pattern: ' . $pattern);
+            foreach ($nameSelectors as $selector) {
+                try {
+                    $element = $crawler->filter($selector);
+                    if ($element->count() > 0) {
+                        $productData['name'] = $selector === 'meta[property="og:title"]' 
+                            ? $element->attr('content')
+                            : $element->text();
+                        if (!empty($productData['name'])) break;
+                    }
+                } catch (\Exception $e) {
+                    continue;
+                }
+            }
+        }
+        
+        // Fallback for price
+        if ($productData['original_price'] == 0) {
+            $priceSelectors = [
+                '.price',
+                '.product-price',
+                '.ma-reference-price',
+                '.price-range-container',
+                'meta[property="product:price:amount"]'
+            ];
+            
+            foreach ($priceSelectors as $selector) {
+                try {
+                    $element = $crawler->filter($selector);
+                    if ($element->count() > 0) {
+                        $priceText = $selector === 'meta[property="product:price:amount"]'
+                            ? $element->attr('content')
+                            : $element->text();
+                        $price = $this->extractPrice($priceText);
+                        if ($price > 0) {
+                            $productData['original_price'] = $price;
                             break;
                         }
-                    } catch (\Exception $e) {
-                        continue;
                     }
+                } catch (\Exception $e) {
+                    continue;
                 }
             }
+        }
+        
+        // Fallback for image
+        if (empty($productData['image'])) {
+            $imageSelectors = [
+                '.main-image img',
+                '.detail-image img',
+                '.product-image img',
+                'meta[property="og:image"]'
+            ];
             
-            if ($jsonData) {
-                // Extract data from JSON
-                $data = $jsonData['data'] ?? $jsonData;
-                
-                // Extract product name
-                if (!empty($data['productInfo']['subject'])) {
-                    $productData['name'] = $data['productInfo']['subject'];
-                } elseif (!empty($data['metaInfo']['title'])) {
-                    $productData['name'] = $data['metaInfo']['title'];
-                } elseif (!empty($data['title'])) {
-                    $productData['name'] = $data['title'];
-                }
-                
-                // Extract price
-                if (!empty($data['priceInfo'])) {
-                    $priceInfo = $data['priceInfo'];
-                    if (!empty($priceInfo['price'])) {
-                        $productData['original_price'] = floatval($priceInfo['price']);
-                    } elseif (!empty($priceInfo['minPrice'])) {
-                        $productData['original_price'] = floatval($priceInfo['minPrice']);
+            foreach ($imageSelectors as $selector) {
+                try {
+                    $element = $crawler->filter($selector);
+                    if ($element->count() > 0) {
+                        $productData['image'] = $selector === 'meta[property="og:image"]'
+                            ? $element->attr('content')
+                            : $element->attr('src');
+                        if (!empty($productData['image'])) break;
                     }
-                }
-                
-                // Extract images
-                if (!empty($data['imageList'])) {
-                    $productData['images'] = array_map(function($img) {
-                        return !empty($img['fullPathImageURI']) ? $img['fullPathImageURI'] : $img['imageURI'];
-                    }, $data['imageList']);
-                    $productData['image'] = $productData['images'][0] ?? '';
-                } elseif (!empty($data['productInfo']['imageList'])) {
-                    $productData['images'] = $data['productInfo']['imageList'];
-                    $productData['image'] = $productData['images'][0] ?? '';
-                }
-                
-                // Extract description
-                if (!empty($data['productInfo']['description'])) {
-                    $productData['description'] = $data['productInfo']['description'];
-                } elseif (!empty($data['description'])) {
-                    $productData['description'] = $data['description'];
+                } catch (\Exception $e) {
+                    continue;
                 }
             }
+        }
+        
+        // Fallback for description
+        if (empty($productData['description'])) {
+            $descriptionSelectors = [
+                '.product-description',
+                '.description',
+                '.detail-desc',
+                'meta[property="og:description"]'
+            ];
             
-            // Fallback to DOM selectors if JSON extraction fails
-            if (empty($productData['name'])) {
-                $nameSelectors = [
-                    '.product-title',
-                    '.product-name',
-                    'h1.title',
-                    '.mod-detail-title h1',
-                    'meta[property="og:title"]'
+            foreach ($descriptionSelectors as $selector) {
+                try {
+                    $element = $crawler->filter($selector);
+                    if ($element->count() > 0) {
+                        $productData['description'] = $selector === 'meta[property="og:description"]'
+                            ? $element->attr('content')
+                            : $element->text();
+                        if (!empty($productData['description'])) break;
+                    }
+                } catch (\Exception $e) {
+                    continue;
+                }
+            }
+        }
+        
+        // NEW: DOM fallback for specifications
+        if (empty($productData['specifications'])) {
+            try {
+                $specSelectors = [
+                    '.product-attributes table tr',
+                    '.product-props table tr',
+                    '.product-specifications .item'
                 ];
                 
-                foreach ($nameSelectors as $selector) {
-                    try {
-                        $element = $crawler->filter($selector);
-                        if ($element->count() > 0) {
-                            $productData['name'] = $selector === 'meta[property="og:title"]' 
-                                ? $element->attr('content')
-                                : $element->text();
-                            if (!empty($productData['name'])) break;
+                foreach ($specSelectors as $selector) {
+                    $crawler->filter($selector)->each(function(Crawler $node) use (&$productData) {
+                        $key = trim($node->filter('th')->count() > 0 ? $node->filter('th')->text() : 
+                            ($node->filter('.name')->count() > 0 ? $node->filter('.name')->text() : ''));
+                        $value = trim($node->filter('td')->count() > 0 ? $node->filter('td')->text() : 
+                            ($node->filter('.value')->count() > 0 ? $node->filter('.value')->text() : ''));
+                        
+                        if (!empty($key) && !empty($value)) {
+                            $productData['specifications'][$key] = $value;
                         }
-                    } catch (\Exception $e) {
-                        continue;
+                    });
+                    
+                    if (!empty($productData['specifications'])) {
+                        break;
                     }
                 }
+            } catch (\Exception $e) {
+                Log::warning('Failed to extract Alibaba specifications from DOM: ' . $e->getMessage());
             }
-            
-            // Fallback for price
-            if ($productData['original_price'] == 0) {
-                $priceSelectors = [
-                    '.price',
-                    '.product-price',
-                    '.ma-reference-price',
-                    '.price-range-container',
-                    'meta[property="product:price:amount"]'
+        }
+        
+        // NEW: DOM fallback for rating
+        if (empty($productData['rating'])) {
+            try {
+                $ratingSelectors = [
+                    '.rating-stars',
+                    '.supplier-star',
+                    '.star-rate span',
+                    '.score-value'
                 ];
                 
-                foreach ($priceSelectors as $selector) {
-                    try {
-                        $element = $crawler->filter($selector);
-                        if ($element->count() > 0) {
-                            $priceText = $selector === 'meta[property="product:price:amount"]'
-                                ? $element->attr('content')
-                                : $element->text();
-                            $price = $this->extractPrice($priceText);
-                            if ($price > 0) {
-                                $productData['original_price'] = $price;
+                foreach ($ratingSelectors as $selector) {
+                    $element = $crawler->filter($selector);
+                    if ($element->count() > 0) {
+                        $ratingText = $element->text();
+                        $rating = floatval(preg_replace('/[^0-9.]/', '', $ratingText));
+                        if ($rating > 0) {
+                            $productData['rating'] = $rating;
+                            break;
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('Failed to extract Alibaba rating from DOM: ' . $e->getMessage());
+            }
+        }
+        
+        // NEW: DOM fallback for review count
+        if (empty($productData['review_count'])) {
+            try {
+                $reviewCountSelectors = [
+                    '.rating-info',
+                    '.reviews-count',
+                    '.review-count'
+                ];
+                
+                foreach ($reviewCountSelectors as $selector) {
+                    $element = $crawler->filter($selector);
+                    if ($element->count() > 0) {
+                        $reviewCountText = $element->text();
+                        $reviewCount = (int) preg_replace('/[^0-9]/', '', $reviewCountText);
+                        if ($reviewCount > 0) {
+                            $productData['review_count'] = $reviewCount;
+                            break;
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('Failed to extract Alibaba review count from DOM: ' . $e->getMessage());
+            }
+        }
+        
+        // NEW: DOM fallback for SKU
+        if (empty($productData['sku'])) {
+            try {
+                $skuSelectors = [
+                    '.product-sku',
+                    '.sku-code',
+                    '.product-code',
+                    '[data-product-id]'
+                ];
+                
+                foreach ($skuSelectors as $selector) {
+                    $element = $crawler->filter($selector);
+                    if ($element->count() > 0) {
+                        if ($selector === '[data-product-id]') {
+                            $productData['sku'] = $element->attr('data-product-id');
+                        } else {
+                            $skuText = $element->text();
+                            $sku = preg_replace('/[^A-Za-z0-9\-]/', '', $skuText);
+                            if (!empty($sku)) {
+                                $productData['sku'] = $sku;
                                 break;
                             }
                         }
-                    } catch (\Exception $e) {
-                        continue;
                     }
                 }
+            } catch (\Exception $e) {
+                Log::warning('Failed to extract Alibaba SKU from DOM: ' . $e->getMessage());
             }
-            
-            // Fallback for image
-            if (empty($productData['image'])) {
-                $imageSelectors = [
-                    '.main-image img',
-                    '.detail-image img',
-                    '.product-image img',
-                    'meta[property="og:image"]'
-                ];
-                
-                foreach ($imageSelectors as $selector) {
-                    try {
-                        $element = $crawler->filter($selector);
-                        if ($element->count() > 0) {
-                            $productData['image'] = $selector === 'meta[property="og:image"]'
-                                ? $element->attr('content')
-                                : $element->attr('src');
-                            if (!empty($productData['image'])) break;
-                        }
-                    } catch (\Exception $e) {
-                        continue;
-                    }
-                }
-            }
-            
-            // Fallback for description
-            if (empty($productData['description'])) {
-                $descriptionSelectors = [
-                    '.product-description',
-                    '.description',
-                    '.detail-desc',
-                    'meta[property="og:description"]'
-                ];
-                
-                foreach ($descriptionSelectors as $selector) {
-                    try {
-                        $element = $crawler->filter($selector);
-                        if ($element->count() > 0) {
-                            $productData['description'] = $selector === 'meta[property="og:description"]'
-                                ? $element->attr('content')
-                                : $element->text();
-                            if (!empty($productData['description'])) break;
-                        }
-                    } catch (\Exception $e) {
-                        continue;
-                    }
-                }
-            }
-            
-            // Clean up the data
-            $productData['name'] = html_entity_decode(trim($productData['name'] ?? 'Unknown Product'));
-            $productData['description'] = html_entity_decode(trim($productData['description'] ?? ''));
-            
-            // Ensure image URLs are absolute
-            if (!empty($productData['image']) && !str_starts_with($productData['image'], 'http')) {
-                $productData['image'] = 'https:' . $productData['image'];
-            }
-            
-            if (!empty($productData['images'])) {
-                foreach ($productData['images'] as &$img) {
-                    if (!empty($img) && !str_starts_with($img, 'http')) {
-                        $img = 'https:' . $img;
-                    }
-                }
-            }
-            
-            // Set store
-            $productData['store'] = 'Alibaba';
-            
-            // Log the extracted data for debugging
-            Log::info('Parsed Alibaba product data: ' . json_encode($productData));
-            
-        } catch (\Exception $e) {
-            Log::error('Error parsing Alibaba product: ' . $e->getMessage());
-            Log::error('Stack trace: ' . $e->getTraceAsString());
-            throw new \Exception('Failed to parse Alibaba product details: ' . $e->getMessage());
         }
         
-        return $productData;
+        // NEW: DOM fallback for brand
+        if (empty($productData['brand'])) {
+            try {
+                $brandSelectors = [
+                    '.company-name',
+                    '.brand-name',
+                    '.supplier-name',
+                    '.company-title a'
+                ];
+                
+                foreach ($brandSelectors as $selector) {
+                    $element = $crawler->filter($selector);
+                    if ($element->count() > 0) {
+                        $brandText = $element->text();
+                        if (!empty($brandText)) {
+                            $productData['brand'] = trim($brandText);
+                            break;
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('Failed to extract Alibaba brand from DOM: ' . $e->getMessage());
+            }
+        }
+        
+        // Clean up the data
+        $productData['name'] = html_entity_decode(trim($productData['name'] ?? 'Unknown Product'));
+        $productData['description'] = html_entity_decode(trim($productData['description'] ?? ''));
+        
+        // Ensure image URLs are absolute
+        if (!empty($productData['image']) && !str_starts_with($productData['image'], 'http')) {
+            $productData['image'] = 'https:' . $productData['image'];
+        }
+        
+        if (!empty($productData['images'])) {
+            foreach ($productData['images'] as &$img) {
+                if (!empty($img) && !str_starts_with($img, 'http')) {
+                    $img = 'https:' . $img;
+                }
+            }
+        }
+        
+        // Set store
+        $productData['store'] = 'Alibaba';
+        
+        // Log the extracted data for debugging
+        Log::info('Parsed Alibaba product data: ' . json_encode($productData));
+        
+    } catch (\Exception $e) {
+        Log::error('Error parsing Alibaba product: ' . $e->getMessage());
+        Log::error('Stack trace: ' . $e->getTraceAsString());
+        throw new \Exception('Failed to parse Alibaba product details: ' . $e->getMessage());
     }
+    
+    return $productData;
+}
     
     /**
      * Parse Zara product

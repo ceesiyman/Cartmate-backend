@@ -493,8 +493,8 @@
                                             "example": "Password reset OTP has been sent to your email."
                                         },
                                         "user_id": {
-                                            "type": "integer",
-                                            "example": 1
+                                            "type": "string",
+                                            "example": "string"
                                         }
                                     },
                                     "type": "object"
@@ -1303,14 +1303,15 @@
                                 ],
                                 "properties": {
                                     "user_id": {
-                                        "description": "ID of the user",
-                                        "type": "integer",
-                                        "example": 1
+                                        "description": "UUID of the user",
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "example": "905932a9-dbaf-49cd-bca9-451914c71d19"
                                     },
                                     "product_id": {
-                                        "description": "ID of the product to add to cart",
-                                        "type": "integer",
-                                        "example": 1
+                                        "description": "UUID of the product to add",
+                                        "type": "string",
+                                        "example": "905932a9-dbaf-49cd-bca9-451914c71d19"
                                     },
                                     "quantity": {
                                         "description": "Quantity of the product to add",
@@ -1342,12 +1343,13 @@
                                         "data": {
                                             "properties": {
                                                 "user_id": {
-                                                    "type": "integer",
-                                                    "example": 1
+                                                    "type": "string",
+                                                    "format": "uuid",
+                                                    "example": "905932a9-dbaf-49cd-bca9-451914c71d19"
                                                 },
                                                 "product_id": {
-                                                    "type": "integer",
-                                                    "example": 1
+                                                    "type": "string",
+                                                    "example": "string"
                                                 },
                                                 "quantity": {
                                                     "type": "integer",
@@ -1356,8 +1358,8 @@
                                                 "product": {
                                                     "properties": {
                                                         "id": {
-                                                            "type": "integer",
-                                                            "example": 1
+                                                            "type": "string",
+                                                            "example": "string"
                                                         },
                                                         "name": {
                                                             "type": "string",
@@ -1441,7 +1443,7 @@
                         "description": "ID of the user",
                         "required": true,
                         "schema": {
-                            "type": "integer"
+                            "type": "string"
                         }
                     }
                 ],
@@ -1461,12 +1463,12 @@
                                             "items": {
                                                 "properties": {
                                                     "user_id": {
-                                                        "type": "integer",
-                                                        "example": 1
+                                                        "type": "string",
+                                                        "example": "agsjad-dfhbd-saadsd"
                                                     },
                                                     "product_id": {
-                                                        "type": "integer",
-                                                        "example": 1
+                                                        "type": "string",
+                                                        "example": "hjas-jkdsf"
                                                     },
                                                     "quantity": {
                                                         "type": "integer",
@@ -1475,8 +1477,8 @@
                                                     "product": {
                                                         "properties": {
                                                             "id": {
-                                                                "type": "integer",
-                                                                "example": 1
+                                                                "type": "string",
+                                                                "example": "ahjdsdkj"
                                                             },
                                                             "name": {
                                                                 "type": "string",
@@ -1567,12 +1569,12 @@
                                 "properties": {
                                     "user_id": {
                                         "description": "ID of the user",
-                                        "type": "integer",
+                                        "type": "string",
                                         "example": 1
                                     },
                                     "product_id": {
                                         "description": "ID of the product in the cart",
-                                        "type": "integer",
+                                        "type": "string",
                                         "example": 1
                                     },
                                     "quantity": {
@@ -1605,12 +1607,12 @@
                                         "data": {
                                             "properties": {
                                                 "user_id": {
-                                                    "type": "integer",
-                                                    "example": 1
+                                                    "type": "string",
+                                                    "example": "string"
                                                 },
                                                 "product_id": {
-                                                    "type": "integer",
-                                                    "example": 1
+                                                    "type": "string",
+                                                    "example": "string"
                                                 },
                                                 "quantity": {
                                                     "type": "integer",
@@ -1619,8 +1621,8 @@
                                                 "product": {
                                                     "properties": {
                                                         "id": {
-                                                            "type": "integer",
-                                                            "example": 1
+                                                            "type": "string",
+                                                            "example": "string"
                                                         },
                                                         "name": {
                                                             "type": "string",
@@ -1729,13 +1731,13 @@
                                 "properties": {
                                     "user_id": {
                                         "description": "ID of the user",
-                                        "type": "integer",
+                                        "type": "string",
                                         "example": 1
                                     },
                                     "product_id": {
                                         "description": "ID of the product to remove from cart",
-                                        "type": "integer",
-                                        "example": 1
+                                        "type": "string",
+                                        "example": "string"
                                     }
                                 },
                                 "type": "object"
@@ -1850,7 +1852,7 @@
                                             "items": {
                                                 "properties": {
                                                     "id": {
-                                                        "type": "integer"
+                                                        "type": "string"
                                                     },
                                                     "name": {
                                                         "type": "string"
@@ -2171,6 +2173,270 @@
                 ]
             }
         },
+        "/api/emails/bulk": {
+            "post": {
+                "tags": [
+                    "Email Subscription"
+                ],
+                "summary": "Send bulk emails to all subscribed users",
+                "description": "Sends emails with the specified subject and content to all users who have subscribed to email notifications",
+                "operationId": "sendBulkEmails",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "subject",
+                                    "content"
+                                ],
+                                "properties": {
+                                    "subject": {
+                                        "description": "Email subject line",
+                                        "type": "string",
+                                        "example": "Special Offer"
+                                    },
+                                    "content": {
+                                        "description": "Full email body (HTML/Markdown)",
+                                        "type": "string",
+                                        "example": "<h1>Special Offer</h1><p>Check out our new promotion!</p>"
+                                    },
+                                    "synchronous": {
+                                        "description": "Optional flag for synchronous sending",
+                                        "type": "boolean",
+                                        "example": false
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Emails successfully sent or queued",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Emails queued for 15 users."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No subscribed users found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "No subscribed users found."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "errors": {
+                                            "type": "object",
+                                            "example": {
+                                                "subject": [
+                                                    "The subject field is required."
+                                                ],
+                                                "content": [
+                                                    "The content field is required."
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to send emails."
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error message details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/users/{userId}/subscription": {
+            "put": {
+                "tags": [
+                    "Email Subscription"
+                ],
+                "summary": "Update a user's email subscription status",
+                "description": "Enables or disables email subscription for a specific user",
+                "operationId": "updateSubscription",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "in": "path",
+                        "description": "ID of the user",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email_subscribed"
+                                ],
+                                "properties": {
+                                    "email_subscribed": {
+                                        "description": "Email subscription status",
+                                        "type": "boolean",
+                                        "example": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Subscription status updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Subscription status updated successfully."
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "user_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "email_subscribed": {
+                                                    "type": "boolean",
+                                                    "example": true
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to update subscription status."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "errors": {
+                                            "type": "object",
+                                            "example": {
+                                                "email_subscribed": [
+                                                    "The email subscribed field is required."
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/orders": {
             "get": {
                 "tags": [
@@ -2185,7 +2451,7 @@
                         "description": "User ID",
                         "required": true,
                         "schema": {
-                            "type": "integer"
+                            "type": "string"
                         }
                     }
                 ],
@@ -2227,8 +2493,8 @@
                             "schema": {
                                 "properties": {
                                     "user_id": {
-                                        "type": "integer",
-                                        "example": 1
+                                        "type": "string",
+                                        "example": "905932a9-dbaf-49cd-bca9-451914c71d19"
                                     },
                                     "shipping_address": {
                                         "type": "string",
@@ -4582,7 +4848,7 @@
                         "in": "query",
                         "required": true,
                         "schema": {
-                            "type": "integer"
+                            "type": "string"
                         }
                     }
                 ],
@@ -4604,8 +4870,8 @@
                                         "data": {
                                             "properties": {
                                                 "id": {
-                                                    "type": "integer",
-                                                    "example": 1
+                                                    "type": "string",
+                                                    "example": "string"
                                                 },
                                                 "name": {
                                                     "type": "string",
@@ -4701,8 +4967,8 @@
                             "schema": {
                                 "properties": {
                                     "user_id": {
-                                        "type": "integer",
-                                        "example": 1
+                                        "type": "string",
+                                        "example": "string"
                                     },
                                     "name": {
                                         "type": "string",
@@ -4874,8 +5140,9 @@
                 "description": "Order model",
                 "properties": {
                     "id": {
-                        "type": "integer",
-                        "example": 1
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "550e8400-e29b-41d4-a716-446655440000"
                     },
                     "user_id": {
                         "type": "integer",
@@ -4936,12 +5203,13 @@
                         "example": 1
                     },
                     "order_id": {
-                        "type": "integer",
-                        "example": 1
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "550e8400-e29b-41d4-a716-446655440000"
                     },
                     "product_id": {
-                        "type": "integer",
-                        "example": 1
+                        "type": "string",
+                        "example": "string"
                     },
                     "quantity": {
                         "type": "integer",
@@ -5073,6 +5341,10 @@
         {
             "name": "Customers",
             "description": "Customers"
+        },
+        {
+            "name": "Email Subscription",
+            "description": "Email Subscription"
         },
         {
             "name": "Orders",

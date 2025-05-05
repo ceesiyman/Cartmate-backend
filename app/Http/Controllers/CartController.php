@@ -26,15 +26,16 @@ class CartController extends Controller
      *             required={"user_id", "product_id", "quantity"},
      *             @OA\Property(
      *                 property="user_id",
-     *                 type="integer",
-     *                 description="ID of the user",
-     *                 example=1
+     *                 type="string",
+     *                 format="uuid",
+     *                 description="UUID of the user",
+     *                 example="905932a9-dbaf-49cd-bca9-451914c71d19"
      *             ),
      *             @OA\Property(
      *                 property="product_id",
-     *                 type="integer",
-     *                 description="ID of the product to add to cart",
-     *                 example=1
+     *                 type="string",
+     *                description="UUID of the product to add",
+     *                 example="905932a9-dbaf-49cd-bca9-451914c71d19"
      *             ),
      *             @OA\Property(
      *                 property="quantity",
@@ -54,13 +55,13 @@ class CartController extends Controller
      *             @OA\Property(
      *                 property="data",
      *                 type="object",
-     *                 @OA\Property(property="user_id", type="integer", example=1),
-     *                 @OA\Property(property="product_id", type="integer", example=1),
+     *                 @OA\Property(property="user_id", type="string", format="uuid", example="905932a9-dbaf-49cd-bca9-451914c71d19"),
+     *                 @OA\Property(property="product_id", type="string", example="string"),
      *                 @OA\Property(property="quantity", type="integer", example=1),
      *                 @OA\Property(
      *                     property="product",
      *                     type="object",
-     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="id", type="string", example="string"),
      *                     @OA\Property(property="name", type="string", example="Product Name"),
      *                     @OA\Property(property="price", type="number", format="float", example=99.99),
      *                     @OA\Property(property="image_url", type="string", example="https://example.com/image.jpg")
@@ -89,7 +90,7 @@ class CartController extends Controller
     public function addToCart(Request $request)
     {
         $request->validate([
-            'user_id' => 'required|exists:users,id',
+            'user_id' => 'required|string|size:36|exists:users,id',
             'product_id' => 'required|exists:products,id',
             'quantity' => 'required|integer|min:1',
         ]);
@@ -153,7 +154,7 @@ class CartController extends Controller
      *         in="query",
      *         required=true,
      *         description="ID of the user",
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string")
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -165,13 +166,13 @@ class CartController extends Controller
      *                 type="array",
      *                 @OA\Items(
      *                     type="object",
-     *                     @OA\Property(property="user_id", type="integer", example=1),
-     *                     @OA\Property(property="product_id", type="integer", example=1),
+     *                     @OA\Property(property="user_id", type="string", example="agsjad-dfhbd-saadsd"),
+     *                     @OA\Property(property="product_id", type="string", example="hjas-jkdsf"),
      *                     @OA\Property(property="quantity", type="integer", example=1),
      *                     @OA\Property(
      *                         property="product",
      *                         type="object",
-     *                         @OA\Property(property="id", type="integer", example=1),
+     *                         @OA\Property(property="id", type="string", example="ahjdsdkj"),
      *                         @OA\Property(property="name", type="string", example="Product Name"),
      *                         @OA\Property(property="price", type="number", format="float", example=99.99),
      *                         @OA\Property(property="image_url", type="string", example="https://example.com/image.jpg")
@@ -240,13 +241,13 @@ class CartController extends Controller
      *             required={"user_id", "product_id", "quantity"},
      *             @OA\Property(
      *                 property="user_id",
-     *                 type="integer",
+     *                 type="string",
      *                 description="ID of the user",
      *                 example=1
      *             ),
      *             @OA\Property(
      *                 property="product_id",
-     *                 type="integer",
+     *                 type="string",
      *                 description="ID of the product in the cart",
      *                 example=1
      *             ),
@@ -268,13 +269,13 @@ class CartController extends Controller
      *             @OA\Property(
      *                 property="data",
      *                 type="object",
-     *                 @OA\Property(property="user_id", type="integer", example=1),
-     *                 @OA\Property(property="product_id", type="integer", example=1),
+     *                 @OA\Property(property="user_id", type="string", example="string"),
+     *                 @OA\Property(property="product_id", type="string", example="string"),
      *                 @OA\Property(property="quantity", type="integer", example=2),
      *                 @OA\Property(
      *                     property="product",
      *                     type="object",
-     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="id", type="string", example="string"),
      *                     @OA\Property(property="name", type="string", example="Product Name"),
      *                     @OA\Property(property="price", type="number", format="float", example=99.99),
      *                     @OA\Property(property="image_url", type="string", example="https://example.com/image.jpg")
@@ -370,15 +371,15 @@ class CartController extends Controller
      *             required={"user_id", "product_id"},
      *             @OA\Property(
      *                 property="user_id",
-     *                 type="integer",
+     *                 type="string",
      *                 description="ID of the user",
      *                 example=1
      *             ),
      *             @OA\Property(
      *                 property="product_id",
-     *                 type="integer",
+     *                 type="string",
      *                 description="ID of the product to remove from cart",
-     *                 example=1
+     *                 example="string"
      *             )
      *         )
      *     ),

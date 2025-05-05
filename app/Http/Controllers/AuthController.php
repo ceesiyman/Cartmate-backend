@@ -497,7 +497,7 @@ private function sendOtpEmail(string $email, string $otp, string $type, string $
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Password reset OTP has been sent to your email."),
-     *             @OA\Property(property="user_id", type="integer", example=1)
+     *             @OA\Property(property="user_id", type="string", example="string")
      *         )
      *     ),
      *     @OA\Response(
